@@ -198,7 +198,61 @@ int main(int argc, char** argv){
             
             printf("\n%d",chdir(args[1]));
             continue;
-        }        
+        }      
+
+        if(!strcmp(args[0], "sys")){
+            printf("sys command \n");
+
+            //Gives the hostname without using a system call
+            if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
+
+            }
+            //Gives the CPU model
+            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&
+                (!strcmp(args[2], "model"))){
+
+            }
+            //Gives the CPU number N frequency
+            if ((args[1]!=NULL)&&
+                (args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&
+                (!strcmp(args[2], "freq"))&&
+                (args[3]!= NULL)&&
+                (args[4]==NULL)){
+
+            }
+            //Set the frequency of the CPU N to X (in HZ)
+            else if ((args[1]!=NULL)&&
+                    (args[2]!=NULL)&&
+                    (!strcmp(args[1], "cpu"))&&
+                    (!strcmp(args[2], "freq"))&&
+                    (args[3]!= NULL)&&
+                    (args[4]!=NULL)){
+
+            }
+            //Get the ip and mask of the interface DEV
+            else if ((args[1]!=NULL)&&
+                    (args[2]!=NULL)&&
+                    (!strcmp(args[1], "ip"))){
+
+            }
+            //Set the ip of the interface DEV to IP/MASK
+            else if ((args[1]!=NULL)&&
+                (args[2]!=NULL)&&
+                (!strcmp(args[1], "ip"))&&
+                (!strcmp(args[2], "addr"))&&
+                (args[3]!= NULL)&&
+                (args[4]!=NULL)&&
+                (arguments[5]!=NULL)){
+
+            }
+            else{
+                printf("1");
+                continue;
+            }
+
+        }  
 
 
         //The command isn't a built-in command
