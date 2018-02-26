@@ -204,12 +204,11 @@ int main(int argc, char** argv){
             printf("sys command \n");
 
             //Gives the hostname without using a system call
-            //Source :  https://www.computerhope.com/unix/uhostnam.htm
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 char name[256];
-                FILE *file = fopen("/proc/sys/kernel/hostname", "r");
 
+                FILE* file = fopen("/proc/sys/kernel/hostname", "r");
                 if(file == NULL){
                     perror("File couldn't be opened");
                     printf("1");
@@ -222,12 +221,43 @@ int main(int argc, char** argv){
                 continue;
 
             }
+
+
             //Gives the CPU model
             if ((args[1]!=NULL)&&(args[2]!=NULL)&&
                 (!strcmp(args[1], "cpu"))&&
                 (!strcmp(args[2], "model"))){
 
+                FILE* file;
+                char* line = NULL;
+                size_t len = 0;
+                char* model = NULL;
+
+                file = fopen("/proc/cpuinfo", "r");
+                if(file == NULL){
+                    perror("File couldn't be opened");
+                    printf("1");
+                    continue;
+                }
+
+                while(getline(&line, &len, file) != -1){
+                    if(strstr(line, "model name")){
+                        model = strtok(line,":");
+                        model = strtok(NULL, "");
+                        break;
+                    }
+
+                }
+
+                fclose(file);
+                if (line)
+                    free(line);
+
+                printf("Cpu model: %s0", model);
+                continue;
             }
+
+
             //Gives the CPU number N frequency
             if ((args[1]!=NULL)&&
                 (args[2]!=NULL)&&
