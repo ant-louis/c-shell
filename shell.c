@@ -204,7 +204,22 @@ int main(int argc, char** argv){
             printf("sys command \n");
 
             //Gives the hostname without using a system call
+            //Source :  https://www.computerhope.com/unix/uhostnam.htm
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
+
+                char name[256];
+                FILE *file = fopen("/proc/sys/kernel/hostname", "r");
+
+                if(file == NULL){
+                    perror("File couldn't be opened");
+                    printf("1");
+                    continue;
+                }
+
+                fgets(name,256,file);
+                fclose(file);
+                printf("Host: %s0",name);
+                continue;
 
             }
             //Gives the CPU model
@@ -244,7 +259,7 @@ int main(int argc, char** argv){
                 (!strcmp(args[2], "addr"))&&
                 (args[3]!= NULL)&&
                 (args[4]!=NULL)&&
-                (arguments[5]!=NULL)){
+                (args[5]!=NULL)){
 
             }
             else{
