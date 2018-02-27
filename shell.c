@@ -170,6 +170,12 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
         }
 
         if(strstr(line, searched_str)){
+
+            if(nummer != 0){
+                nummer--;
+                continue;
+            }
+
             *output_str = strtok(line,":");
             *output_str = strtok(NULL, "");
             result = true;
@@ -294,6 +300,15 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(args[2]!=NULL)&&
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "freq"))&&
                 (args[3]!= NULL)&&(args[4]==NULL)){
+
+                if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
+                    perror("No such string founded");
+                    printf("1");
+                    continue;
+                }
+
+                printf("%s0", output_str);
+                continue;
 
             }
 
