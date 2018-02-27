@@ -140,18 +140,19 @@ void convert_whitespace_dir(char** args){
 *   - path : the corresponding path of the file
 *   - searched_str : the searched string in the file
 *   - output_str : the corresponding output to the searched string
-*   - number : 
+*   - nummer : 
 *
 * RETURN : true if the string has been found, false otherwise.
 *
 *******************************************************************************************/
-bool find_in_file(const char* path, char* searched_str, char* output_str, int number){
+bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer){
 
     FILE* file;
     char* line = NULL;
     size_t len = 0;
     bool result = false;
-    int i = 0;
+
+    //Opening the file
     file = fopen(path, "r");
     if(file == NULL){
         perror("File couldn't be opened");
@@ -159,29 +160,25 @@ bool find_in_file(const char* path, char* searched_str, char* output_str, int nu
         return false;
     }
 
-    if(!strcmp(searched_str, "hostname")){
-        getline(&output_str, &len, file);
-        fclose(file);
-        return true;
-
-    }
-
+    
     while(getline(&line, &len, file) != -1){
+
+        if(!strcmp(searched_str, "hostname")){
+            *output_str = line;
+            fclose(file);
+            return true;
+        }
+
         if(strstr(line, searched_str)){
-            
-            if(number == 0 || i == number){ //We want the ith processor/information
-                output_str = strtok(line,":"); //Remove the title
-                output_str = strtok(NULL, ""); //Extract the useful information
-                result = true;
-                break;
-            }
-            i++;
+            *output_str = strtok(line,":");
+            *output_str = strtok(NULL, "");
+            result = true;
+            break;
         }
 
     }
 
     fclose(file);
-
 
     return result;
 }
@@ -203,6 +200,7 @@ int main(int argc, char** argv){
     pid_t pid;
     int status;
     
+    char* output_str = NULL;
 
     while(!stop){
 
@@ -262,62 +260,44 @@ int main(int argc, char** argv){
 
             //printf("sys command \n");
 
-            char* output_str = NULL;
-
             //Gives the hostname without using a system call
-            if ((args[1]!=NULL)&&
-                (!strcmp(args[1], "hostname"))){
+            if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
-                if(!find_in_file("/proc/sys/kernel/hostname", "hostname", output_str, 0)){
-                    perror("No such string found");
+                if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
-                printf("Host: %s0", output_str);
+                printf("%s0", output_str);
                 continue;
-                
+
             }
 
 
             //Gives the CPU model
-            if ((args[1]!=NULL)&&
-                (args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&
-                (!strcmp(args[2], "model"))){
+            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
-                if(!find_in_file("/proc/cpuinfo", "model name", output_str, 0)){
-                    perror("No such string found");
+                if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
-                printf("Cpu model: %s0", output_str);
+                printf("%s0", output_str);
                 continue;
             }
 
 
             //Gives the CPU frequency of Nth processor
-            if ((args[1]!=NULL)&&
-                (args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&
-                (!strcmp(args[2], "freq"))&&
-                (args[3]!= NULL)&&
-                (args[4]==NULL)){
+            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "freq"))&&
+                (args[3]!= NULL)&&(args[4]==NULL)){
 
-                int number = atoi(args[3]);
-
-                if(!find_in_file("/proc/cpuinfo", "cpu MHz", output_str,number)){
-                    perror("No such string found");
-                    printf("1");
-                    continue;
-                }
-
-                printf("CPU #%d frequency: %s0",number,output_str);
             }
 
-    
-            
+
             //Set the frequency of the CPU N to X (in HZ)
             else if ((args[1]!=NULL)&&
                     (args[2]!=NULL)&&
@@ -327,12 +307,16 @@ int main(int argc, char** argv){
                     (args[4]!=NULL)){
 
             }
+
+
             //Get the ip and mask of the interface DEV
             else if ((args[1]!=NULL)&&
                     (args[2]!=NULL)&&
                     (!strcmp(args[1], "ip"))){
 
             }
+
+        
             //Set the ip of the interface DEV to IP/MASK
             else if ((args[1]!=NULL)&&
                 (args[2]!=NULL)&&
