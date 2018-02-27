@@ -140,12 +140,12 @@ void convert_whitespace_dir(char** args){
 *   - path : the corresponding path of the file
 *   - searched_str : the searched string in the file
 *   - output_str : the corresponding output to the searched string
-*   - nummer : 
+*   - number : 
 *
 * RETURN : true if the string has been found, false otherwise.
 *
 *******************************************************************************************/
-bool find_in_file(const char* path, char* searched_str, char* output_str, int nummer){
+bool find_in_file(const char* path, char* searched_str, char* output_str, int number){
 
     FILE* file;
     char* line = NULL;
@@ -177,8 +177,7 @@ bool find_in_file(const char* path, char* searched_str, char* output_str, int nu
     }
 
     fclose(file);
-    if (line)
-        free(line);
+
 
     return result;
 }
@@ -265,7 +264,7 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", output_str, 0)){
-                    perror("No such string founded");
+                    perror("No such string found");
                     printf("1");
                     continue;
                 }
