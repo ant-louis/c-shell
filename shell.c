@@ -151,7 +151,7 @@ bool find_in_file(const char* path, char* searched_str, char* output_str, int nu
     char* line = NULL;
     size_t len = 0;
     bool result = false;
-
+    int i = 0;
     file = fopen(path, "r");
     if(file == NULL){
         perror("File couldn't be opened");
@@ -168,10 +168,14 @@ bool find_in_file(const char* path, char* searched_str, char* output_str, int nu
 
     while(getline(&line, &len, file) != -1){
         if(strstr(line, searched_str)){
-            output_str = strtok(line,":");
-            output_str = strtok(NULL, "");
-            result = true;
-            break;
+            
+            if(number == 0 || i == number){ //We want the ith processor/information
+                output_str = strtok(line,":"); //Remove the title
+                output_str = strtok(NULL, ""); //Extract the useful information
+                result = true;
+                break;
+            }
+            i++;
         }
 
     }
@@ -261,7 +265,8 @@ int main(int argc, char** argv){
             char* output_str = NULL;
 
             //Gives the hostname without using a system call
-            if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
+            if ((args[1]!=NULL)&&
+                (!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", output_str, 0)){
                     perror("No such string found");
@@ -271,16 +276,18 @@ int main(int argc, char** argv){
 
                 printf("Host: %s0", output_str);
                 continue;
-
+                
             }
 
 
             //Gives the CPU model
-            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
+            if ((args[1]!=NULL)&&
+                (args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&
+                (!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", output_str, 0)){
-                    perror("No such string founded");
+                    perror("No such string found");
                     printf("1");
                     continue;
                 }
@@ -291,11 +298,26 @@ int main(int argc, char** argv){
 
 
             //Gives the CPU frequency of Nth processor
-            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "freq"))&&
-                (args[3]!= NULL)&&(args[4]==NULL)){
+            if ((args[1]!=NULL)&&
+                (args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&
+                (!strcmp(args[2], "freq"))&&
+                (args[3]!= NULL)&&
+                (args[4]==NULL)){
 
+                int number = atoi(args[3]);
+
+                if(!find_in_file("/proc/cpuinfo", "cpu MHz", output_str,number)){
+                    perror("No such string found");
+                    printf("1");
+                    continue;
+                }
+
+                printf("CPU #%d frequency: %s0",number,output_str);
             }
+
+    
+            
             //Set the frequency of the CPU N to X (in HZ)
             else if ((args[1]!=NULL)&&
                     (args[2]!=NULL)&&
