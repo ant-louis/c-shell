@@ -140,12 +140,12 @@ void convert_whitespace_dir(char** args){
 *   - path : the corresponding path of the file
 *   - searched_str : the searched string in the file
 *   - output_str : the corresponding output to the searched string
-*   - nummer : 
+*   - number : 
 *
 * RETURN : true if the string has been found, false otherwise.
 *
 *******************************************************************************************/
-bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer){
+bool find_in_file(const char* path, char* searched_str, char** output_str, int number){
 
     FILE* file;
     char* line = NULL;
@@ -170,9 +170,9 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
         }
 
         if(strstr(line, searched_str)){
-
-            if(nummer != 0){
-                nummer--;
+            
+            if(number != 0){
+                number--;
                 continue;
             }
 
@@ -270,7 +270,7 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
-                    perror("No such string founded");
+                    perror("No such string found");
                     printf("1");
                     continue;
                 }
@@ -286,7 +286,7 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-                    perror("No such string founded");
+                    perror("No such string found");
                     printf("1");
                     continue;
                 }
@@ -302,7 +302,7 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-                    perror("No such string founded");
+                    perror("No such string found");
                     printf("1");
                     continue;
                 }
