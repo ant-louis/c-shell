@@ -13,6 +13,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 
 
 /*************************************Prototypes*********************************************/
@@ -274,7 +279,7 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                printf("Host: %s0", output_str);
+                printf("Host: %s\n0", output_str);
                 continue;
                 
             }
@@ -292,7 +297,7 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                printf("Cpu model: %s0", output_str);
+                printf("Cpu model: %s\n0", output_str);
                 continue;
             }
 
@@ -313,7 +318,7 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                printf("CPU #%d frequency: %s0",number,output_str);
+                printf("CPU #%d frequency: %s\n0",number,output_str);
             }
 
     
@@ -326,11 +331,93 @@ int main(int argc, char** argv){
                     (args[3]!= NULL)&&
                     (args[4]!=NULL)){
 
+                int number = atoi(args[3]);
+                char path[256];
+                size_t frequency = atoi(args[4]);
+                snprintf(path,sizeof(number),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
+                FILE* file = fopen(path,"w");
+                if(!file){
+                    perror("File couldn't be opened");
+                    printf("1");
+                    continue;
+                }
+
+                fprintf(file,"%zd",frequency);
+                fclose(file);
+
+
+
             }
             //Get the ip and mask of the interface DEV
-            else if ((args[1]!=NULL)&&
-                    (args[2]!=NULL)&&
-                    (!strcmp(args[1], "ip"))){
+            else if ((args[1] != NULL)&&
+                    (args[2] != NULL)&&
+                    (!strcmp(args[1], "ip"))&&
+                    (!strcmp(args[2], "addr"))&&
+                    (args[3] != NULL)&&
+                    (args[4] == NULL)){
+
+                    char* dev = args[3];
+
+                    // Create a socket in UDP mode
+                    int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
+     
+                    if (socket_desc == -1){
+                        printf("Socket couldn't be created\n");
+                        printf("1");
+                        continue;
+                    }
+
+
+                    //Creating an interface structure
+                    struct ifreq my_ifreq; 
+
+                    size_t length_if_name= strlen(dev);
+                    //Check that the ifr_name is big enough
+                    if (length_if_name < sizeof(my_ifreq.ifr_name)){ 
+
+                        memcpy(my_ifreq.ifr_name,dev,length_if_name);
+                        my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
+                    }else{
+
+                        perror("The interface name is too long");
+                        continue;
+                    }
+
+                    // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
+                    if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
+
+                        int errnum = errno;
+
+                        perror("Couldn't retrieve the IP address");
+                        fprintf(stderr, "Value of errno: %d\n",errno);
+                        fprintf(stderr, "Error: %s \n",strerror(errnum));
+                        close(socket_desc);
+                        printf("1");
+                        continue;
+                    }
+
+                    //Extract the address
+                    struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
+                    printf("IP address: %s\n0",inet_ntoa(IP_address->sin_addr));
+
+                    // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
+                    if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
+
+                        int errnum = errno;
+
+                        perror("Couldn't retrieve the mask");
+                        fprintf(stderr, "Value of errno: %d\n",errno);
+                        fprintf(stderr, "Error: %s \n",strerror(errnum));
+                        close(socket_desc);
+                        continue;
+                    }
+
+                    //Cast and extract the mask
+                    struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
+                    printf("Mask: %s\n0",inet_ntoa(mask->sin_addr));
+
+                    close(socket_desc);//Don't need the socket anymore
+
 
             }
             //Set the ip of the interface DEV to IP/MASK
