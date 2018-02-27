@@ -132,6 +132,61 @@ void convert_whitespace_dir(char** args){
 
 
 
+/*************************************find_in_file*****************************************
+*
+* Find a certain string in a file 
+*
+* ARGUMENT :
+*   - path : the corresponding path of the file
+*   - searched_str : the searched string in the file
+*   - output_str : the corresponding output to the searched string
+*   - nummer : 
+*
+* RETURN : true if the string has been found, false otherwise.
+*
+*******************************************************************************************/
+bool find_in_file(const char* path, char* searched_str, char* output_str, int nummer){
+
+    FILE* file;
+    char* line = NULL;
+    size_t len = 0;
+    bool result = false;
+
+    file = fopen(path, "r");
+    if(file == NULL){
+        perror("File couldn't be opened");
+        printf("1");
+        return false;
+    }
+
+    if(!strcmp(searched_str, "hostname")){
+        getline(&output_str, &len, file);
+        fclose(file);
+        return true;
+
+    }
+
+    while(getline(&line, &len, file) != -1){
+        if(strstr(line, searched_str)){
+            output_str = strtok(line,":");
+            output_str = strtok(NULL, "");
+            result = true;
+            break;
+        }
+
+    }
+
+    fclose(file);
+    if (line)
+        free(line);
+
+    return result;
+}
+
+
+
+
+
 
 /******************************************main**********************************************/
 int main(int argc, char** argv){
@@ -201,23 +256,21 @@ int main(int argc, char** argv){
         }      
 
         if(!strcmp(args[0], "sys")){
-            printf("sys command \n");
+
+            //printf("sys command \n");
+
+            char* output_str = NULL;
 
             //Gives the hostname without using a system call
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
-                char name[256];
-
-                FILE* file = fopen("/proc/sys/kernel/hostname", "r");
-                if(file == NULL){
-                    perror("File couldn't be opened");
+                if(!find_in_file("/proc/sys/kernel/hostname", "hostname", output_str, 0)){
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
-                fgets(name,256,file);
-                fclose(file);
-                printf("Host: %s0",name);
+                printf("Host: %s0", output_str);
                 continue;
 
             }
@@ -225,46 +278,23 @@ int main(int argc, char** argv){
 
             //Gives the CPU model
             if ((args[1]!=NULL)&&(args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&
-                (!strcmp(args[2], "model"))){
+                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
-                FILE* file;
-                char* line = NULL;
-                size_t len = 0;
-                char* model = NULL;
-
-                file = fopen("/proc/cpuinfo", "r");
-                if(file == NULL){
-                    perror("File couldn't be opened");
+                if(!find_in_file("/proc/cpuinfo", "model name", output_str, 0)){
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
-                while(getline(&line, &len, file) != -1){
-                    if(strstr(line, "model name")){
-                        model = strtok(line,":");
-                        model = strtok(NULL, "");
-                        break;
-                    }
-
-                }
-
-                fclose(file);
-                if (line)
-                    free(line);
-
-                printf("Cpu model: %s0", model);
+                printf("Cpu model: %s0", output_str);
                 continue;
             }
 
 
-            //Gives the CPU number N frequency
-            if ((args[1]!=NULL)&&
-                (args[2]!=NULL)&&
-                (!strcmp(args[1], "cpu"))&&
-                (!strcmp(args[2], "freq"))&&
-                (args[3]!= NULL)&&
-                (args[4]==NULL)){
+            //Gives the CPU frequency of Nth processor
+            if ((args[1]!=NULL)&&(args[2]!=NULL)&&
+                (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "freq"))&&
+                (args[3]!= NULL)&&(args[4]==NULL)){
 
             }
             //Set the frequency of the CPU N to X (in HZ)
