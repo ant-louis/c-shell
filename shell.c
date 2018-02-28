@@ -334,7 +334,7 @@ int main(int argc, char** argv){
                 int number = atoi(args[3]);
                 char path[256];
                 size_t frequency = atoi(args[4]);
-                snprintf(path,sizeof(number),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
+                snprintf(path,sizeof(number),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",number);
                 FILE* file = fopen(path,"w");
                 if(!file){
                     perror("File couldn't be opened");
@@ -398,7 +398,7 @@ int main(int argc, char** argv){
 
                     //Extract the address
                     struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("IP address: %s\n0",inet_ntoa(IP_address->sin_addr));
+                    printf("IP address: %s\n",inet_ntoa(IP_address->sin_addr));
 
                     // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
                     if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
@@ -414,7 +414,7 @@ int main(int argc, char** argv){
 
                     //Cast and extract the mask
                     struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("Mask: %s\n0",inet_ntoa(mask->sin_addr));
+                    printf("Mask: %s\n",inet_ntoa(mask->sin_addr));
 
                     close(socket_desc);//Don't need the socket anymore
 
@@ -428,6 +428,56 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&
                 (args[4]!=NULL)&&
                 (args[5]!=NULL)){
+
+
+
+                char* dev = args[3];
+
+                // Create a socket in UDP mode
+                int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
+ 
+                if (socket_desc == -1){
+                    printf("Socket couldn't be created\n");
+                    printf("1");
+                    continue;
+                }
+
+                //Creating an interface structure
+                struct ifreq my_ifreq; 
+
+                size_t length_if_name= strlen(dev);
+                //Check that the ifr_name is big enough
+                if (length_if_name < sizeof(my_ifreq.ifr_name)){ 
+
+                    memcpy(my_ifreq.ifr_name,dev,length_if_name);
+                    my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
+                }else{
+
+                    perror("The interface name is too long");
+                    continue;
+                }
+
+
+
+                ;
+
+                if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
+
+                int errnum = errno;
+
+                    perror("Couldn't retrieve the address");
+                    fprintf(stderr, "Value of errno: %d\n",errno);
+                    fprintf(stderr, "Error: %s \n",strerror(errnum));
+                    close(socket_desc);
+                    continue;
+                }
+
+
+                ioctl(socketFD, SIOCGIFFLAGS, &iFreq);
+                my_ifreq.ifr_flags |= IFF_UP | IFF_RUNNING;
+                ioctl(socketFD, SIOCGIFFLAGS, &iFreq);
+
+
 
             }
             else{
