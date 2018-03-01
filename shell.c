@@ -459,7 +459,7 @@ int main(int argc, char** argv){
 
 
 
-                ;
+                             
 
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
 
@@ -473,9 +473,9 @@ int main(int argc, char** argv){
                 }
 
 
-                ioctl(socketFD, SIOCGIFFLAGS, &iFreq);
-                my_ifreq.ifr_flags |= IFF_UP | IFF_RUNNING;
-                ioctl(socketFD, SIOCGIFFLAGS, &iFreq);
+                ioctl(socket_desc, SIOCGIFFLAGS, &my_ifreq); //Load flags
+                my_ifreq.ifr_flags |= IFF_UP | IFF_RUNNING; //Change flags
+                ioctl(socket_desc, SIOCGIFFLAGS, &my_ifreq); //Save flags
 
 
 
