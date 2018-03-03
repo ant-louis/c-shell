@@ -280,11 +280,8 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-<<<<<<< HEAD
                 printf("%s0", output_str);
-=======
-                printf("Host: %s\n0", output_str);
->>>>>>> IPandMask
+
                 continue;
 
             }
@@ -300,11 +297,8 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-<<<<<<< HEAD
                 printf("%s0", output_str);
-=======
-                printf("Cpu model: %s\n0", output_str);
->>>>>>> IPandMask
+
                 continue;
             }
 
@@ -320,13 +314,10 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-<<<<<<< HEAD
                 printf("%s0", output_str);
                 continue;
 
-=======
-                printf("CPU #%d frequency: %s\n0",number,output_str);
->>>>>>> IPandMask
+
             }
 
 
