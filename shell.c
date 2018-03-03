@@ -275,7 +275,7 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
-                    perror("No such string found");
+                    printf("No such string found\n");
                     printf("1");
                     continue;
                 }
@@ -292,7 +292,7 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-                    perror("No such string found");
+                    printf("No such string found\n");
                     printf("1");
                     continue;
                 }
@@ -309,7 +309,7 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-                    perror("No such string found");
+                    printf("No such string found\n");
                     printf("1");
                     continue;
                 }
@@ -321,7 +321,7 @@ int main(int argc, char** argv){
             }
 
 
-            //Set the frequency of the CPU N to X (in HZ)
+            //Set the frequency of the CPU N to X (in Hz)
             else if ((args[1]!=NULL)&&
                     (args[2]!=NULL)&&
                     (!strcmp(args[1], "cpu"))&&
@@ -331,11 +331,21 @@ int main(int argc, char** argv){
 
                 int number = atoi(args[3]);
                 char path[256];
-                size_t frequency = atoi(args[4]);
-                snprintf(path,sizeof(number),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",number);
+                //Convert frequency from Hz to kHz
+                int frequency = atoi(args[4])/1000;
+                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
+                
+                FILE* file = fopen(path,"w");
+                if(file == NULL){
+                    perror("File couldn't be opened");
+                    printf("1");
+                    continue;
+                }
 
-
-
+                fprintf(file,"%d",frequency);
+                fclose(file);
+                printf("0");
+                continue;
             }
 
 
