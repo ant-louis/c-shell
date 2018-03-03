@@ -2,7 +2,7 @@
 *
 * Antoine Louis & Tom Crasset
 *
-* Operating systems : Projet 1 - shell
+* Operating systems : Projet 2 - Shell with built-ins
 *******************************************************************************************/
 
 #include <sys/types.h> 
@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -265,7 +266,6 @@ int main(int argc, char** argv){
 
         if(!strcmp(args[0], "sys")){
 
-            //printf("sys command \n");
 
             char* output_str = NULL;
 
@@ -335,15 +335,6 @@ int main(int argc, char** argv){
                 char path[256];
                 size_t frequency = atoi(args[4]);
                 snprintf(path,sizeof(number),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",number);
-                FILE* file = fopen(path,"w");
-                if(!file){
-                    perror("File couldn't be opened");
-                    printf("1");
-                    continue;
-                }
-
-                fprintf(file,"%zd",frequency);
-                fclose(file);
 
 
 
@@ -373,7 +364,7 @@ int main(int argc, char** argv){
 
                     size_t length_if_name= strlen(dev);
                     //Check that the ifr_name is big enough
-                    if (length_if_name < sizeof(my_ifreq.ifr_name)){ 
+                    if (length_if_name < IFNAMSIZ){ 
 
                         memcpy(my_ifreq.ifr_name,dev,length_if_name);
                         my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
@@ -386,11 +377,8 @@ int main(int argc, char** argv){
                     // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
                     if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
 
-                        int errnum = errno;
 
                         perror("Couldn't retrieve the IP address");
-                        fprintf(stderr, "Value of errno: %d\n",errno);
-                        fprintf(stderr, "Error: %s \n",strerror(errnum));
                         close(socket_desc);
                         printf("1");
                         continue;
@@ -403,12 +391,9 @@ int main(int argc, char** argv){
                     // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
                     if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
 
-                        int errnum = errno;
-
                         perror("Couldn't retrieve the mask");
-                        fprintf(stderr, "Value of errno: %d\n",errno);
-                        fprintf(stderr, "Error: %s \n",strerror(errnum));
                         close(socket_desc);
+                        printf("1");
                         continue;
                     }
 
@@ -416,8 +401,7 @@ int main(int argc, char** argv){
                     struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
                     printf("Mask: %s\n",inet_ntoa(mask->sin_addr));
 
-                    close(socket_desc);//Don't need the socket anymore
-
+                    close(socket_desc);
 
             }
             //Set the ip of the interface DEV to IP/MASK
@@ -430,14 +414,18 @@ int main(int argc, char** argv){
                 (args[5]!=NULL)){
 
 
+                //Interface name and length
+                char* dev = args[3]; 
+                size_t length_if_name= strlen(dev); 
 
-                char* dev = args[3];
+                char* address = args[4];
+                char* mask = args[5];
 
                 // Create a socket in UDP mode
                 int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
  
                 if (socket_desc == -1){
-                    printf("Socket couldn't be created\n");
+                    perror("Socket couldn't be created\n");
                     printf("1");
                     continue;
                 }
@@ -445,29 +433,42 @@ int main(int argc, char** argv){
                 //Creating an interface structure
                 struct ifreq my_ifreq; 
 
-                size_t length_if_name= strlen(dev);
                 //Check that the ifr_name is big enough
-                if (length_if_name < sizeof(my_ifreq.ifr_name)){ 
-
+                if (length_if_name < IFNAMSIZ){ 
+                    //Set the name of the interface you want to look at
                     memcpy(my_ifreq.ifr_name,dev,length_if_name);
-                    my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
-                }else{
+                    //End the name with terminating char
+                    my_ifreq.ifr_name[length_if_name]=0;
 
+                }else{
+                    close(socket_desc);
                     perror("The interface name is too long");
+                    printf("1");
                     continue;
                 }
 
+                //Creating an address structure;
+                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
+                my_ifreq.ifr_addr.sa_family = AF_INET;
 
+                // Converting from string to address structure
+                inet_pton(AF_INET, dev,  &address_struct->sin_addr);
 
-                             
-
+                //Setting the new IP address
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
 
-                int errnum = errno;
+                    perror("Couldn't set the address");
+                    printf("1");
+                    close(socket_desc);
+                    continue;
+                }
+                // Converting from string to address structure
+                inet_pton(AF_INET, mask,  &address_struct->sin_addr);
+                //Setting the mask
+                if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
 
-                    perror("Couldn't retrieve the address");
-                    fprintf(stderr, "Value of errno: %d\n",errno);
-                    fprintf(stderr, "Error: %s \n",strerror(errnum));
+                    perror("Couldn't set the mask");
+                    printf("1");
                     close(socket_desc);
                     continue;
                 }
@@ -475,16 +476,14 @@ int main(int argc, char** argv){
 
                 ioctl(socket_desc, SIOCGIFFLAGS, &my_ifreq); //Load flags
                 my_ifreq.ifr_flags |= IFF_UP | IFF_RUNNING; //Change flags
-                ioctl(socket_desc, SIOCGIFFLAGS, &my_ifreq); //Save flags
-
-
+                ioctl(socket_desc, SIOCSIFFLAGS, &my_ifreq); //Save flags
+                close(socket_desc);
 
             }
             else{
                 printf("1");
                 continue;
             }
-
         }  
 
 
