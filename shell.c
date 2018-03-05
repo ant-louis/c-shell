@@ -25,6 +25,7 @@ int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
 void manage_dollar();
+int checkVariable(char** args);
 
 struct variable{
     char* name;
