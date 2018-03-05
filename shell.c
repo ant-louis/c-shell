@@ -2,7 +2,7 @@
 *
 * Antoine Louis & Tom Crasset
 *
-* Operating systems : Projet 1 - shell
+* Operating systems : Projet 2 - shell with built-in's
 *******************************************************************************************/
 
 #include <sys/types.h> 
@@ -24,8 +24,11 @@
 int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
-void manage_dollar();
+bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer);
+void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid);
 
+
+/****************************************Structures*****************************************/
 struct variable{
     char* name;
     char* value;
@@ -190,6 +193,7 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 
             *output_str = strtok(line,":");
             *output_str = strtok(NULL, "");
+            memmove(*output_str, *output_str+1, strlen(*output_str)); //Remove the whitespace
             result = true;
             break;
         }
@@ -201,7 +205,8 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
     return result;
 }
 
-/*************************************checkVariable*****************************************
+
+/*************************************check_variable*****************************************
 *
 * Check if one tries to assign a variable. If so, store it.
 *
@@ -212,9 +217,11 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 * RETURN : 0 if succesful, -1 otherwise.
 *
 *******************************************************************************************/
-int checkVariable(char** args){
+int check_variable(char** args){
+
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
+
     //Copy the value of args[0] to not lose the variable across calls
     char args_copy[256] = "";
     strcpy(args_copy,args[0]);
@@ -242,9 +249,9 @@ int checkVariable(char** args){
             var[count++].name = strtok(args_copy,"=");
 
         }
-        else{
+        else
             return -1;
-        }
+        
     }
 
     return 0;
@@ -330,7 +337,7 @@ int main(int argc, char** argv){
         int nb_args = split_line(line, args);
 
         //Check if the user enters a variable
-        if(checkVariable(args) == -1){
+        if(check_variable(args) == -1){
             printf("1");
             continue;
         }
@@ -346,6 +353,7 @@ int main(int argc, char** argv){
 
         //Replace $! or $? by the corresponding term
         manage_dollar(args, nb_args,prev_return, prev_pid);
+
 
         //The command is cd
         if(!strcmp(args[0], "cd")){
@@ -374,21 +382,21 @@ int main(int argc, char** argv){
             }
 
             
-            printf("\n%d",chdir(args[1]));
+            printf("%d",chdir(args[1]));
             continue;
         }      
 
 
+        //The command is sys
         else if(!strcmp(args[0], "sys")){
-
 
 
             //Gives the hostname without using a system call
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
-                    perror("No such string founded");
                     printf("1");
+                    prev_return = 
                     continue;
                 }
 
@@ -403,7 +411,6 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-
                     printf("1");
                     continue;
                 }
@@ -419,7 +426,6 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-
                     printf("1");
                     continue;
                 }
@@ -685,7 +691,7 @@ int main(int argc, char** argv){
             if(!background){
                 wait(&status);
                 prev_return = WEXITSTATUS(status);
-                printf("\n%d",prev_return);
+                printf("%d",prev_return);
             }
             //If there is a background running (due to the &), we're getting the pid of this background
             else{
