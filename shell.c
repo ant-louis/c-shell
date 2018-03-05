@@ -26,6 +26,8 @@ int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
 bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer);
 void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid);
+int check_variable(char** args);
+
 
 
 /****************************************Structures*****************************************/
