@@ -333,7 +333,7 @@ int main(int argc, char** argv){
 
 
 
-        if(!strcmp(args[0], "sys")){
+        else if(!strcmp(args[0], "sys")){
 
 
             //Gives the hostname without using a system call
@@ -396,7 +396,7 @@ int main(int argc, char** argv){
                 
                 //Convert frequency from Hz to kHz
                 int frequency = atoi(args[4])/1000;
-                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",number);
+                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
                 
                 FILE* file = fopen(path,"w");
                 if(file == NULL){
@@ -423,7 +423,7 @@ int main(int argc, char** argv){
                     char* dev = args[3];
 
                     // Create a socket in UDP mode
-                    int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
+                    int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
      
                     if (socket_desc == -1){
                         printf("Socket couldn't be created\n");
@@ -434,6 +434,8 @@ int main(int argc, char** argv){
 
                     //Creating an interface structure
                     struct ifreq my_ifreq; 
+                    //IPv4
+                    my_ifreq.ifr_addr.sa_family = AF_INET;
 
                     size_t length_if_name= strlen(dev);
                     //Check that the ifr_name is big enough
@@ -449,7 +451,6 @@ int main(int argc, char** argv){
 
                     // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
                     if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
-
 
                         perror("Couldn't retrieve the IP address");
                         close(socket_desc);
@@ -473,8 +474,9 @@ int main(int argc, char** argv){
                     //Cast and extract the mask
                     struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
                     printf(".%s\n",inet_ntoa(mask->sin_addr));
-
                     close(socket_desc);
+                    printf("0");
+                    continue;
 
             }
 
@@ -497,7 +499,7 @@ int main(int argc, char** argv){
                 char* mask = args[5];
 
                 // Create a socket in UDP mode
-                int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
+                int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
  
                 if (socket_desc == -1){
                     perror("Socket couldn't be created\n");
@@ -507,6 +509,11 @@ int main(int argc, char** argv){
 
                 //Creating an interface structure
                 struct ifreq my_ifreq; 
+                //IPv4
+                my_ifreq.ifr_addr.sa_family = AF_INET;
+
+                //Creating an address structure;
+                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
 
                 //Check that the ifr_name is big enough
                 if (length_if_name < IFNAMSIZ){ 
@@ -522,12 +529,8 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                //Creating an address structure;
-                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
-                my_ifreq.ifr_addr.sa_family = AF_INET;
-
                 // Converting from string to address structure
-                inet_pton(AF_INET, dev,  &address_struct->sin_addr);
+                inet_pton(AF_INET, dev, &address_struct->sin_addr);
 
                 //Setting the new IP address
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
@@ -537,8 +540,10 @@ int main(int argc, char** argv){
                     close(socket_desc);
                     continue;
                 }
+
                 // Converting from string to address structure
                 inet_pton(AF_INET, mask,  &address_struct->sin_addr);
+
                 //Setting the mask
                 if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
 
@@ -554,6 +559,9 @@ int main(int argc, char** argv){
                 ioctl(socket_desc, SIOCSIFFLAGS, &my_ifreq); //Save flags
                 close(socket_desc);
 
+                printf("0");
+                continue;
+
             }
             else{
                 printf("1");
@@ -567,24 +575,18 @@ int main(int argc, char** argv){
 
         //Error
         if(pid < 0){
-            int errnum = errno;
 
             perror("Process creation failed");
-            fprintf(stderr, "Value of errno: %d\n",errno);
-            fprintf(stderr, "Error: %s \n",strerror(errnum));
             exit(EXIT_FAILURE);
         }
 
         //This is the son
         if(pid == 0){
-
             //Absolute path of command
             if(args[0][0] == '/'){
                 if(execv(args[0],args) == -1){
-                    int errnum = errno;
+
                     perror("Instruction failed");
-                    fprintf(stderr, "Value of errno: %d\n",errno);
-                    fprintf(stderr, "Error: %s \n",strerror(errnum));
                 }
             }
 
@@ -614,10 +616,8 @@ int main(int argc, char** argv){
                     //Check if path contains the command to execute
                     if(access(path,X_OK) == 0){
                         if(execv(path,args) == -1){
-                            int errnum = errno;
+
                             perror("Instruction failed");
-                            fprintf(stderr, "Value of errno: %d\n",errno);
-                            fprintf(stderr, "Error: %s \n",strerror(errnum));
                         }
 
                         break;
@@ -630,6 +630,7 @@ int main(int argc, char** argv){
 
         //This is the father
         else{
+
             wait(&status);
             returnvalue = WEXITSTATUS(status);
             printf("\n%d",returnvalue);
