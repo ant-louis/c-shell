@@ -2,7 +2,7 @@
 *
 * Antoine Louis & Tom Crasset
 *
-* Operating systems : Projet 2 - Shell with built-ins
+* Operating systems : Projet 1 - shell
 *******************************************************************************************/
 
 #include <sys/types.h> 
@@ -13,18 +13,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 
 
 /*************************************Prototypes*********************************************/
 int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
+void manage_dollar();
 
 
 
@@ -95,6 +90,8 @@ int get_paths(char** paths) {
 * ARGUMENT :
 *   - args : an array containing all the args of the line  entered by the user
 *
+* RETURN : /
+*
 * NB: it will clear all args except args[0] and args[1]
 *
 *******************************************************************************************/
@@ -146,12 +143,12 @@ void convert_whitespace_dir(char** args){
 *   - path : the corresponding path of the file
 *   - searched_str : the searched string in the file
 *   - output_str : the corresponding output to the searched string
-*   - number : 
+*   - nummer : 
 *
 * RETURN : true if the string has been found, false otherwise.
 *
 *******************************************************************************************/
-bool find_in_file(const char* path, char* searched_str, char** output_str, int number){
+bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer){
 
     FILE* file;
     char* line = NULL;
@@ -176,9 +173,9 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
         }
 
         if(strstr(line, searched_str)){
-            
-            if(number != 0){
-                number--;
+
+            if(nummer != 0){
+                nummer--;
                 continue;
             }
 
@@ -196,6 +193,40 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 }
 
 
+/*************************************manage_dollar*****************************************
+*
+* Replace the dollar terms ($? and $!) by their corresponding value, i.e. :
+*   - $? : Stores the exit value of the last command that was executed.
+*   - $! : Contains the process ID of the most recently executed background pipeline
+*
+* ARGUMENT :
+*   - args : an array containing all the args of the line  entered by the user
+*   - nb_args : the number of arguments
+*   - prev_return : the previous return value of the foreground command
+*   - prev_pid : the previous pid of the background pipeline
+*
+* RETURN : /
+*
+*******************************************************************************************/
+void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
+
+    //Check all the arguments and replace the dollar signs by their value
+    for(int i=0; i < nb_args; i++){
+
+        if(!strcmp(args[i], "$?")){
+            snprintf(args[i], 256, "%d", prev_return);
+        }
+
+        if(!strcmp(args[i], "$!")){
+
+            if(prev_pid != 0)
+                snprintf(args[i], 256, "%d", prev_pid);
+            else
+                args[i] = NULL;
+        }
+    }
+
+}
 
 
 
@@ -204,7 +235,9 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 int main(int argc, char** argv){
 
     bool stop = false;
-    int returnvalue;
+    int prev_return;
+    int prev_pid;
+    bool background = false;
 
     char line[65536]; 
     char* args[256];
@@ -219,6 +252,7 @@ int main(int argc, char** argv){
         //Clear the variables
         strcpy(line,"");
         memset(args, 0, sizeof(args));
+        background = false;
 
         //Prompt
         printf("> ");
@@ -236,6 +270,19 @@ int main(int argc, char** argv){
 
         //User enters a line 
         int nb_args = split_line(line, args);
+
+        //Check if the command ends with &.
+        /*If a command is terminated by the control operator &, 
+        the shell executes the command in the background in a subshell. 
+        The shell does not wait for the command to finish, and the return status is 0.*/
+        if(!strcmp(args[nb_args-1], "&")){
+            background = true;
+            args[--nb_args] = NULL;
+        }
+
+        //Replace $! or $? by the corresponding term
+        manage_dollar(args, nb_args,prev_return, prev_pid);
+
 
         //The command is cd
         if(!strcmp(args[0], "cd")){
@@ -268,6 +315,8 @@ int main(int argc, char** argv){
             continue;
         }      
 
+
+        //The command is sys
         if(!strcmp(args[0], "sys")){
 
 
@@ -275,13 +324,12 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
-                    printf("No such string found\n");
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
                 printf("%s0", output_str);
-
                 continue;
 
             }
@@ -292,13 +340,12 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-                    printf("No such string found\n");
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
 
                 printf("%s0", output_str);
-
                 continue;
             }
 
@@ -309,7 +356,7 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-                    printf("No such string found\n");
+                    perror("No such string founded");
                     printf("1");
                     continue;
                 }
@@ -317,11 +364,10 @@ int main(int argc, char** argv){
                 printf("%s0", output_str);
                 continue;
 
-
             }
 
 
-            //Set the frequency of the CPU N to X (in Hz)
+            //Set the frequency of the CPU N to X (in HZ)
             else if ((args[1]!=NULL)&&
                     (args[2]!=NULL)&&
                     (!strcmp(args[1], "cpu"))&&
@@ -329,89 +375,13 @@ int main(int argc, char** argv){
                     (args[3]!= NULL)&&
                     (args[4]!=NULL)){
 
-                int number = atoi(args[3]);
-                char path[256];
-                //Convert frequency from Hz to kHz
-                int frequency = atoi(args[4])/1000;
-                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
-                
-                FILE* file = fopen(path,"w");
-                if(file == NULL){
-                    perror("File couldn't be opened");
-                    printf("1");
-                    continue;
-                }
-
-                fprintf(file,"%d",frequency);
-                fclose(file);
-                printf("0");
-                continue;
             }
 
 
             //Get the ip and mask of the interface DEV
-            else if ((args[1] != NULL)&&
-                    (args[2] != NULL)&&
-                    (!strcmp(args[1], "ip"))&&
-                    (!strcmp(args[2], "addr"))&&
-                    (args[3] != NULL)&&
-                    (args[4] == NULL)){
-
-                    char* dev = args[3];
-
-                    // Create a socket in UDP mode
-                    int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
-     
-                    if (socket_desc == -1){
-                        printf("Socket couldn't be created\n");
-                        printf("1");
-                        continue;
-                    }
-
-
-                    //Creating an interface structure
-                    struct ifreq my_ifreq; 
-
-                    size_t length_if_name= strlen(dev);
-                    //Check that the ifr_name is big enough
-                    if (length_if_name < IFNAMSIZ){ 
-
-                        memcpy(my_ifreq.ifr_name,dev,length_if_name);
-                        my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
-                    }else{
-
-                        perror("The interface name is too long");
-                        continue;
-                    }
-
-                    // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
-                    if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
-
-
-                        perror("Couldn't retrieve the IP address");
-                        close(socket_desc);
-                        printf("1");
-                        continue;
-                    }
-
-                    //Extract the address
-                    struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("IP address: %s\n",inet_ntoa(IP_address->sin_addr));
-
-                    // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
-                    if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
-
-                        perror("Couldn't retrieve the mask");
-                        close(socket_desc);
-                        printf("1");
-                        continue;
-                    }
-
-                    //Cast and extract the mask
-                    struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("Mask: %s\n",inet_ntoa(mask->sin_addr));
-
-                    close(socket_desc);
+            else if ((args[1]!=NULL)&&
+                    (args[2]!=NULL)&&
+                    (!strcmp(args[1], "ip"))){
 
             }
 
@@ -425,77 +395,12 @@ int main(int argc, char** argv){
                 (args[4]!=NULL)&&
                 (args[5]!=NULL)){
 
-
-                //Interface name and length
-                char* dev = args[3]; 
-                size_t length_if_name= strlen(dev); 
-
-                char* address = args[4];
-                char* mask = args[5];
-
-                // Create a socket in UDP mode
-                int socket_desc = socket(AF_INET , SOCK_DGRAM , 0);
- 
-                if (socket_desc == -1){
-                    perror("Socket couldn't be created\n");
-                    printf("1");
-                    continue;
-                }
-
-                //Creating an interface structure
-                struct ifreq my_ifreq; 
-
-                //Check that the ifr_name is big enough
-                if (length_if_name < IFNAMSIZ){ 
-                    //Set the name of the interface you want to look at
-                    memcpy(my_ifreq.ifr_name,dev,length_if_name);
-                    //End the name with terminating char
-                    my_ifreq.ifr_name[length_if_name]=0;
-
-                }else{
-                    close(socket_desc);
-                    perror("The interface name is too long");
-                    printf("1");
-                    continue;
-                }
-
-                //Creating an address structure;
-                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
-                my_ifreq.ifr_addr.sa_family = AF_INET;
-
-                // Converting from string to address structure
-                inet_pton(AF_INET, dev,  &address_struct->sin_addr);
-
-                //Setting the new IP address
-                if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
-
-                    perror("Couldn't set the address");
-                    printf("1");
-                    close(socket_desc);
-                    continue;
-                }
-                // Converting from string to address structure
-                inet_pton(AF_INET, mask,  &address_struct->sin_addr);
-                //Setting the mask
-                if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
-
-                    perror("Couldn't set the mask");
-                    printf("1");
-                    close(socket_desc);
-                    continue;
-                }
-
-
-                ioctl(socket_desc, SIOCGIFFLAGS, &my_ifreq); //Load flags
-                my_ifreq.ifr_flags |= IFF_UP | IFF_RUNNING; //Change flags
-                ioctl(socket_desc, SIOCSIFFLAGS, &my_ifreq); //Save flags
-                close(socket_desc);
-
             }
             else{
                 printf("1");
                 continue;
             }
+
         }  
 
 
@@ -567,9 +472,18 @@ int main(int argc, char** argv){
 
         //This is the father
         else{
-            wait(&status);
-            returnvalue = WEXITSTATUS(status);
-            printf("\n%d",returnvalue);
+
+            //If there is no background pipeline running, just getting the return value
+            if(!background){
+                wait(&status);
+                prev_return = WEXITSTATUS(status);
+                printf("\n%d",prev_return);
+            }
+            //If there is a background running (due to the &), we're getting the pid of this background
+            else{
+                prev_pid = getpid();
+                printf("PID: %d", prev_pid);
+            }
             
         }
 
