@@ -26,6 +26,10 @@ int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
 
+struct variable{
+    char* name;
+    char* value;
+};
 
 
 /*************************************split_line*****************************************
@@ -195,6 +199,55 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
     return result;
 }
 
+/*************************************checkVariable*****************************************
+*
+* Check if one tries to assign a variable. If so, store it.
+*
+* ARGUMENT :
+*   - path : arguments entered as a command
+
+*
+* RETURN : 0 if succesful, -1 otherwise.
+*
+*******************************************************************************************/
+int checkVariable(char** args){
+    //Get a pointer starting at the '='
+    char* ptr = strchr(args[0],'=');
+    //Copy the value of args[0] to not lose the variable across calls
+    char args_copy[256] = "";
+    strcpy(args_copy,args[0]);
+
+    //Structure saving previous variables
+    static struct variable var[256];
+    static int count = 0;
+
+    //Checking that '=' is surrounded by something
+    if(ptr != NULL && ptr+1 != NULL && ptr-1 != NULL) {
+        //Checking that there is nothing following
+        if(args[1] == NULL){
+            char buffer[256];
+            int i = 0;
+            char c;
+
+            //Extracting the assigned value
+            do{
+                c = *(ptr+i+1);
+                buffer[i++] = c;
+            }
+            while(c != 0);
+
+            var[count].value = buffer;
+            var[count++].name = strtok(args_copy,"=");
+
+        }
+        else{
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 
 
 
@@ -237,6 +290,16 @@ int main(int argc, char** argv){
         //User enters a line 
         int nb_args = split_line(line, args);
 
+        //Check if the user enters a variable
+        if(checkVariable(args) == -1){
+            printf("1");
+            continue;
+        }
+
+
+
+
+
         //The command is cd
         if(!strcmp(args[0], "cd")){
 
@@ -268,6 +331,8 @@ int main(int argc, char** argv){
             continue;
         }      
 
+
+
         if(!strcmp(args[0], "sys")){
 
 
@@ -292,13 +357,11 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-                    printf("No such string found\n");
                     printf("1");
                     continue;
                 }
 
                 printf("%s0", output_str);
-
                 continue;
             }
 
@@ -309,7 +372,6 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-                    printf("No such string found\n");
                     printf("1");
                     continue;
                 }
@@ -331,9 +393,10 @@ int main(int argc, char** argv){
 
                 int number = atoi(args[3]);
                 char path[256];
+                
                 //Convert frequency from Hz to kHz
                 int frequency = atoi(args[4])/1000;
-                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",number);
+                snprintf(path,256,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",number);
                 
                 FILE* file = fopen(path,"w");
                 if(file == NULL){
@@ -396,7 +459,7 @@ int main(int argc, char** argv){
 
                     //Extract the address
                     struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("IP address: %s\n",inet_ntoa(IP_address->sin_addr));
+                    printf("%s",inet_ntoa(IP_address->sin_addr));
 
                     // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
                     if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
@@ -409,7 +472,7 @@ int main(int argc, char** argv){
 
                     //Cast and extract the mask
                     struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("Mask: %s\n",inet_ntoa(mask->sin_addr));
+                    printf(".%s\n",inet_ntoa(mask->sin_addr));
 
                     close(socket_desc);
 
