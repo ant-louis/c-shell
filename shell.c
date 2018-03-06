@@ -195,7 +195,7 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 
             *output_str = strtok(line,":");
             *output_str = strtok(NULL, "");
-            memmove(*output_str, *output_str+1, strlen(*output_str)); //Remove the whitespace
+            memmove(*output_str, *output_str+1, strlen(*output_str)); //Remove the whitespace after :
             result = true;
             break;
         }
@@ -300,6 +300,23 @@ void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
 }
 
 
+/*************************************print_failure*****************************************
+*
+* Change the value of the previous return value to 1 when there is an error, then print 1.
+*
+* ARGUMENT :
+*   - prev_return : the previous return value
+
+*
+* RETURN : /
+*
+*******************************************************************************************/
+void print_failure(char* return_nb, int* prev_return){
+    *prev_return = atoi(return_nb);
+    printf("%s", return_nb);
+}
+
+
 
 
 /******************************************main**********************************************/
@@ -344,7 +361,7 @@ int main(int argc, char** argv){
 
         //Check if the user enters a variable
         if(check_variable(args) == -1){
-            printf("1");
+            print_failure("1", &prev_return);
             continue;
         }
 
@@ -387,8 +404,11 @@ int main(int argc, char** argv){
                 convert_whitespace_dir(args);
             }
 
-            
-            printf("%d",chdir(args[1]));
+            int ret = chdir(args[1]);
+            if(ret == -1)
+                print_failure("-1", &prev_return);
+            else
+                printf("%d",ret);
             continue;
         }      
 
@@ -401,8 +421,7 @@ int main(int argc, char** argv){
             if ((args[1]!=NULL)&&(!strcmp(args[1], "hostname"))){
 
                 if(!find_in_file("/proc/sys/kernel/hostname", "hostname", &output_str, 0)){
-                    printf("1");
-                    prev_return = 
+                    print_failure("1", &prev_return);
                     continue;
                 }
 
@@ -417,7 +436,7 @@ int main(int argc, char** argv){
                 (!strcmp(args[1], "cpu"))&&(!strcmp(args[2], "model"))){
 
                 if(!find_in_file("/proc/cpuinfo", "model name", &output_str, 0)){
-                    printf("1");
+                    print_failure("1", &prev_return);
                     continue;
                 }
 
@@ -432,7 +451,7 @@ int main(int argc, char** argv){
                 (args[3]!= NULL)&&(args[4]==NULL)){
 
                 if(!find_in_file("/proc/cpuinfo", "cpu MHz", &output_str, atoi(args[3]))){
-                    printf("1");
+                    print_failure("1", &prev_return);
                     continue;
                 }
 
@@ -460,12 +479,13 @@ int main(int argc, char** argv){
                 FILE* file = fopen(path,"w");
                 if(file == NULL){
                     perror("File couldn't be opened");
-                    printf("1");
+                    print_failure("1", &prev_return);
                     continue;
                 }
 
                 fprintf(file,"%d",frequency);
                 fclose(file);
+
                 printf("0");
                 continue;
 
@@ -485,9 +505,10 @@ int main(int argc, char** argv){
                     // Create a socket in UDP mode
                     int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
      
+                    //If socket couldn't be created
                     if (socket_desc == -1){
-                        printf("Socket couldn't be created\n");
-                        printf("1");
+                        perror("Socket couldn't be created\n");
+                        print_failure("1", &prev_return);
                         continue;
                     }
 
@@ -503,9 +524,10 @@ int main(int argc, char** argv){
 
                         memcpy(my_ifreq.ifr_name,dev,length_if_name);
                         my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
-                    }else{
-
+                    }
+                    else{
                         perror("The interface name is too long");
+                        print_failure("1", &prev_return);
                         continue;
                     }
 
@@ -513,8 +535,8 @@ int main(int argc, char** argv){
                     if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
 
                         perror("Couldn't retrieve the IP address");
+                        print_failure("1", &prev_return);
                         close(socket_desc);
-                        printf("1");
                         continue;
                     }
 
@@ -526,8 +548,8 @@ int main(int argc, char** argv){
                     if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
 
                         perror("Couldn't retrieve the mask");
+                        print_failure("1", &prev_return);
                         close(socket_desc);
-                        printf("1");
                         continue;
                     }
 
@@ -535,6 +557,7 @@ int main(int argc, char** argv){
                     struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
                     printf(".%s\n",inet_ntoa(mask->sin_addr));
                     close(socket_desc);
+
                     printf("0");
                     continue;
 
@@ -562,9 +585,10 @@ int main(int argc, char** argv){
                 // Create a socket in UDP mode
                 int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
  
+                //If socket couldn't be created
                 if (socket_desc == -1){
                     perror("Socket couldn't be created\n");
-                    printf("1");
+                    print_failure("1", &prev_return);
                     continue;
                 }
 
@@ -583,10 +607,11 @@ int main(int argc, char** argv){
                     //End the name with terminating char
                     my_ifreq.ifr_name[length_if_name]=0;
 
-                }else{
-                    close(socket_desc);
+                }
+                else{
                     perror("The interface name is too long");
-                    printf("1");
+                    print_failure("1", &prev_return);
+                    close(socket_desc);
                     continue;
                 }
 
@@ -597,7 +622,7 @@ int main(int argc, char** argv){
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
 
                     perror("Couldn't set the address");
-                    printf("1");
+                    print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
                 }
@@ -609,7 +634,7 @@ int main(int argc, char** argv){
                 if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
 
                     perror("Couldn't set the mask");
-                    printf("1");
+                    print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
                 }
@@ -624,8 +649,10 @@ int main(int argc, char** argv){
                 continue;
 
             }
+
+            //In all other cases, error
             else{
-                printf("1");
+                print_failure("1", &prev_return);
                 continue;
             }
 
@@ -637,29 +664,27 @@ int main(int argc, char** argv){
 
         //Error
         if(pid < 0){
-
             perror("Process creation failed");
             exit(EXIT_FAILURE);
         }
 
         //This is the son
         if(pid == 0){
+
             //Absolute path of command
             if(args[0][0] == '/'){
                 if(execv(args[0],args) == -1){
-
                     perror("Instruction failed");
+                    print_failure("-1", &prev_return);
                 }
             }
 
             //Relative path -- Need to check the $PATH environment variable
             else{
-
-                char* paths[256];              
+                char* paths[256];
+                int j = 1;            
 
                 int nb_paths = get_paths(paths);
-
-                int j = 1;
 
                 /*In the case of commands like mkdir/rmdir, if the first argument is a directory with whitespaces ("a b", 'a b', a\ b),
                   we need to change this directory in something understandable for the shell*/
@@ -677,32 +702,30 @@ int main(int argc, char** argv){
                 
                     //Check if path contains the command to execute
                     if(access(path,X_OK) == 0){
+
                         if(execv(path,args) == -1){
-
                             perror("Instruction failed");
+                            print_failure("-1", &prev_return);
                         }
-
+                        
                         break;
                     }
                 }
             }
-
+            
             exit(EXIT_FAILURE);
         }
 
         //This is the father
         else{
 
-            //If there is no background pipeline running, just getting the return value
-            if(!background){
-                wait(&status);
-                prev_return = WEXITSTATUS(status);
-                printf("%d",prev_return);
-            }
+            wait(&status);
+            prev_return = WEXITSTATUS(status);
+            printf("%d",prev_return);
+
             //If there is a background running (due to the &), we're getting the pid of this background
-            else{
+            if(background){
                 prev_pid = getpid();
-                printf("PID: %d", prev_pid);
             }
             
         }
