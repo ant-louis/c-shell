@@ -35,6 +35,9 @@ struct variable{
     char name[256];
     char value[256];
 };
+//Structure saving previous variables
+static struct variable var[256];
+static int count = 0;
 
 
 /*************************************split_line*****************************************
@@ -223,9 +226,6 @@ int check_variable(char** args){
 
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
-    //Structure saving previous variables
-    static struct variable var[256];
-    static int count = 0;
 
     //Checking that '=' is surrounded by something
     if(ptr != NULL && ptr+1 != NULL && ptr-1 != NULL) {
@@ -288,12 +288,21 @@ void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
             snprintf(args[i], 256, "%d", prev_return);
         }
 
-        if(!strcmp(args[i], "$!")){
+        else if(!strcmp(args[i], "$!")){
 
             if(prev_pid != 0)
                 snprintf(args[i], 256, "%d", prev_pid);
             else
                 args[i] = NULL;
+        }
+        else if(args[i][0] == '$'){
+            if(var[i].name != NULL){
+                args[i][0] = 0;
+                if(strcmp(var[i].name,args[i]) == true){
+                    args[i] = var[i].value;
+                };
+            }
+
         }
     }
 
