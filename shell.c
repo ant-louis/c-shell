@@ -223,17 +223,13 @@ int check_variable(char** args){
 
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
-
-    //Copy the value of args[0] to not lose the variable across calls
-    char args_copy[256] = "";
-    strcpy(args_copy,args[0]);
-
     //Structure saving previous variables
     static struct variable var[256];
     static int count = 0;
 
     //Checking that '=' is surrounded by something
     if(ptr != NULL && ptr+1 != NULL && ptr-1 != NULL) {
+        
         //Checking that there is nothing following
         if(args[1] == NULL){
             char buffer[256];
