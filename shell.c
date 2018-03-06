@@ -25,7 +25,7 @@ int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
 bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer);
-void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid);
+int manage_dollar(char** args, int prev_return, int prev_pid);
 int check_variable(char** args);
 
 
@@ -219,7 +219,7 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 *   - path : arguments entered as a command
 
 *
-* RETURN : 0 if succesful, -1 otherwise.
+* RETURN : 1 if not assignement, 0 if assignement successfull, -1 if unsuccessful
 *
 *******************************************************************************************/
 int check_variable(char** args){
@@ -227,40 +227,56 @@ int check_variable(char** args){
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
 
+    //No variable assignement
+    if(ptr == NULL){
+        return 1; 
+    }
+
     //Checking that '=' is surrounded by something
-    if(ptr != NULL && ptr+1 != NULL && ptr-1 != NULL) {
-        
-        //Checking that there is nothing following
-        if(args[1] == NULL){
-            char buffer[256];
+    if(ptr+1 != NULL && ptr-1 != NULL) {
+            
+            if(args[1] != NULL){
+                convert_whitespace_dir(args);
+                //Concatenate the two strings
+                char tmp[256];
+                strcpy(tmp,args[1]);
+                strcat(args[0]," ");
+                strcat(args[0],tmp);
+            }
+            
 
             int i = 0;
+            int j = 0;
             char c = args[0][0];
 
             //Extracting the name
             while(c != '='){
-
                 var[count].name[i++] = c;
                 c = args[0][i];
             }
 
-            i++;
+            i++;//DISCARD '='
+
+            c = args[0][i];
+
+            //Discard leading character
+            if(c == '\"' || c == '\''){
+                i++;
+                c = args[0][i];
+            }
+
             //Extracting the assigned value
             while(i < strlen(args[0])){
                 
-                c = args[0][i];
-                var[count].value[i++] = c;
+                var[count].value[j++] = c;
+                c = args[0][++i];
             }
+            printf("Name:%s Variable:%s\n",var[count].name,var[count].value);
             count++;
-
-
-        }
-        else
-            return -1;
-        
+            return 0;
     }
-
-    return 0;
+    //Wrong syntax
+    return -1;
 }
 
 
@@ -272,20 +288,20 @@ int check_variable(char** args){
 *
 * ARGUMENT :
 *   - args : an array containing all the args of the line  entered by the user
-*   - nb_args : the number of arguments
 *   - prev_return : the previous return value of the foreground command
 *   - prev_pid : the previous pid of the background pipeline
 *
-* RETURN : /
+* RETURN : 0 if replaced a variable, 1 otherwise
 *
 *******************************************************************************************/
-void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
+int manage_dollar(char** args, int prev_return, int prev_pid){
 
     //Check all the arguments and replace the dollar signs by their value
-    for(int i=0; i < nb_args; i++){
+    for(int i=0; args[i] != NULL; i++){
 
         if(!strcmp(args[i], "$?")){
             snprintf(args[i], 256, "%d", prev_return);
+            return 0;
         }
 
         else if(!strcmp(args[i], "$!")){
@@ -294,18 +310,39 @@ void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
                 snprintf(args[i], 256, "%d", prev_pid);
             else
                 args[i] = NULL;
+            return 0;
         }
-        else if(args[i][0] == '$'){
-            if(var[i].name != NULL){
-                args[i][0] = 0;
-                if(strcmp(var[i].name,args[i]) == true){
-                    args[i] = var[i].value;
-                };
-            }
+        else{
+            //For all arguments
+            int cnt = 0;
+            for(int j = 0; j < strlen(args[i]);j++){
+                //Check if any of them contain $
+                if(args[i][j] == '$'){
+                    char buffer[256] = "";
+                    int k = 0;
+                    j++; //Don't take $
 
+                    //Extract the following variable name
+                    while(j < strlen(args[i])) {
+                        buffer[k++] = args[i][j++]; 
+                    }
+
+                    //Check if this name exists in the database
+                    while(var[cnt].name != NULL){
+                        if(!strcmp(var[cnt].name,buffer) == true){
+                            //Replace the argument with the stored variable
+                            args[i] = var[cnt].value; 
+                            //printf("args[%d]=%s",i,args[i]);
+                            return 0; //Exit the function
+                        }
+                        cnt++;
+                    
+                    }
+                }
+            }
         }
     }
-
+    return 1;
 }
 
 
@@ -369,8 +406,14 @@ int main(int argc, char** argv){
         int nb_args = split_line(line, args);
 
         //Check if the user enters a variable
-        if(check_variable(args) == -1){
+        int result = check_variable(args);
+        //Syntax error during assignement
+        if(result == -1){
             print_failure("1", &prev_return);
+            continue;
+        }//We stored a variable in our database
+        else if(result == 0){
+            printf("0");
             continue;
         }
 
@@ -378,13 +421,15 @@ int main(int argc, char** argv){
         /*If a command is terminated by the control operator &, 
         the shell executes the command in the background in a subshell. 
         The shell does not wait for the command to finish, and the return status is 0.*/
-        if(!strcmp(args[nb_args-1], "&")){
+        if(args[nb_args-1] != NULL && !strcmp(args[nb_args-1], "&")){
             background = true;
             args[--nb_args] = NULL;
         }
 
-        //Replace $! or $? by the corresponding term
-        manage_dollar(args, nb_args,prev_return, prev_pid);
+        //Replace $!, $? or $variable by the corresponding term
+        manage_dollar(args,prev_return, prev_pid);
+
+        
 
 
         //The command is cd
@@ -732,7 +777,8 @@ int main(int argc, char** argv){
             prev_return = WEXITSTATUS(status);
             printf("%d",prev_return);
 
-            //If there is a background running (due to the &), we're getting the pid of this background
+            //If there is a background process running (due to the &),
+            //we're getting the pid of this background process
             if(background){
                 prev_pid = getpid();
             }
