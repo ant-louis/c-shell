@@ -32,8 +32,8 @@ int check_variable(char** args);
 
 /****************************************Structures*****************************************/
 struct variable{
-    char* name;
-    char* value;
+    char name[256];
+    char value[256];
 };
 
 
@@ -237,18 +237,26 @@ int check_variable(char** args){
         //Checking that there is nothing following
         if(args[1] == NULL){
             char buffer[256];
+
             int i = 0;
-            char c;
+            char c = args[0][0];
 
-            //Extracting the assigned value
-            do{
-                c = *(ptr+i+1);
-                buffer[i++] = c;
+            //Extracting the name
+            while(c != '='){
+
+                var[count].name[i++] = c;
+                c = args[0][i];
             }
-            while(c != 0);
 
-            var[count].value = buffer;
-            var[count++].name = strtok(args_copy,"=");
+            i++;
+            //Extracting the assigned value
+            while(i < strlen(args[0])){
+                
+                c = args[0][i];
+                var[count].value[i++] = c;
+            }
+            count++;
+
 
         }
         else
