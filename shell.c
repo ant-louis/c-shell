@@ -25,7 +25,7 @@
 int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
-bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer);
+bool find_in_file(const char* path, char* searched_str, char** output_str, int number);
 int manage_dollar(char** args, int prev_return, int prev_pid);
 int check_variable(char** args);
 
@@ -161,12 +161,12 @@ void convert_whitespace_dir(char** args){
 *   - path : the corresponding path of the file
 *   - searched_str : the searched string in the file
 *   - output_str : the corresponding output to the searched string
-*   - nummer : 
+*   - number : 
 *
 * RETURN : true if the string has been found, false otherwise.
 *
 *******************************************************************************************/
-bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer){
+bool find_in_file(const char* path, char* searched_str, char** output_str, int number){
 
     FILE* file;
     char* line = NULL;
@@ -192,8 +192,8 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 
         if(strstr(line, searched_str)){
 
-            if(nummer != 0){
-                nummer--;
+            if(number != 0){
+                number--;
                 continue;
             }
 
@@ -585,7 +585,6 @@ int main(int argc, char** argv){
                         continue;
                     }
 
-
                     //Creating an interface structure
                     struct ifreq my_ifreq; 
                     //IPv4
@@ -667,9 +666,7 @@ int main(int argc, char** argv){
 
                 //Creating an interface structure
                 struct ifreq my_ifreq; 
-                //IPv4
-                my_ifreq.ifr_addr.sa_family = AF_INET;
-
+                
                 //Creating an address structure;
                 struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
 
@@ -689,7 +686,7 @@ int main(int argc, char** argv){
                 }
 
                 // Converting from string to address structure
-                inet_pton(AF_INET, dev, &address_struct->sin_addr);
+                inet_pton(AF_INET, address, &address_struct->sin_addr);
 
                 //Setting the new IP address
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
@@ -700,8 +697,11 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                // Converting from string to address structure
-                inet_pton(AF_INET, mask,  &address_struct->sin_addr);
+                //Creating an address structure;
+                struct sockaddr_in* mask_struct = (struct sockaddr_in*)&my_ifreq.ifr_netmask;
+
+                // Converting from string to mask structure
+                inet_pton(AF_INET, mask,  &mask_struct->sin_addr);
 
                 //Setting the mask
                 if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
@@ -791,7 +791,7 @@ int main(int argc, char** argv){
 
         //This is the father
         else{
-            prev_pid = waitpid(-1, &status,0)
+            prev_pid = waitpid(-1, &status,0);
             prev_return = WEXITSTATUS(status);
             printf("%d",prev_return);
         }
