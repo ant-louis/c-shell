@@ -32,8 +32,8 @@ int check_variable(char** args);
 
 /****************************************Structures*****************************************/
 struct variable{
-    char name[256];
-    char value[256];
+    char* name;
+    char* value;
 };
 
 
@@ -237,26 +237,18 @@ int check_variable(char** args){
         //Checking that there is nothing following
         if(args[1] == NULL){
             char buffer[256];
-
             int i = 0;
-            char c = args[0][0];
+            char c;
 
-            //Extracting the name
-            while(c != '='){
-
-                var[count].name[i++] = c;
-                c = args[0][i];
-            }
-
-            i++;
             //Extracting the assigned value
-            while(i < strlen(args[0])){
-                
-                c = args[0][i];
-                var[count].value[i++] = c;
+            do{
+                c = *(ptr+i+1);
+                buffer[i++] = c;
             }
-            count++;
+            while(c != 0);
 
+            var[count].value = buffer;
+            var[count++].name = strtok(args_copy,"=");
 
         }
         else
@@ -310,7 +302,7 @@ void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
 *
 * ARGUMENT :
 *   - prev_return : the previous return value
-*   - return_nb : a string corresponding to the error value
+
 *
 * RETURN : /
 *
@@ -329,6 +321,7 @@ int main(int argc, char** argv){
     bool stop = false;
     int prev_return;
     int prev_pid;
+    bool background = false;
 
     char line[65536]; 
     char* args[256];
@@ -343,6 +336,7 @@ int main(int argc, char** argv){
         //Clear the variables
         strcpy(line,"");
         memset(args, 0, sizeof(args));
+        background = false;
 
         //Prompt
         printf("> ");
@@ -367,6 +361,14 @@ int main(int argc, char** argv){
             continue;
         }
 
+        //Check if the command ends with &.
+        /*If a command is terminated by the control operator &, 
+        the shell executes the command in the background in a subshell. 
+        The shell does not wait for the command to finish, and the return status is 0.*/
+        if(!strcmp(args[nb_args-1], "&")){
+            background = true;
+            args[--nb_args] = NULL;
+        }
 
         //Replace $! or $? by the corresponding term
         manage_dollar(args, nb_args,prev_return, prev_pid);
@@ -712,9 +714,16 @@ int main(int argc, char** argv){
 
         //This is the father
         else{
-            prev_pid = waitpid(-1, &status,0)
+
+            wait(&status);
             prev_return = WEXITSTATUS(status);
-            printf("%d",prev_return); 
+            printf("%d",prev_return);
+
+            //If there is a background running (due to the &), we're getting the pid of this background
+            if(background){
+                prev_pid = getpid();
+            }
+            
         }
 
     }
