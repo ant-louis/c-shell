@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
@@ -216,10 +217,10 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 * Check if one tries to assign a variable. If so, store it.
 *
 * ARGUMENT :
-*   - path : arguments entered as a command
+*   - args : arguments entered as a command
 
 *
-* RETURN : 1 if not assignement, 0 if assignement successfull, -1 if unsuccessful
+* RETURN : 1 if no assignement, 0 if assignement successfull, -1 if unsuccessful
 *
 *******************************************************************************************/
 int check_variable(char** args){
@@ -247,34 +248,49 @@ int check_variable(char** args){
 
             int i = 0;
             int j = 0;
+            char name_buffer[256];
+            char value_buffer[256];
             char c = args[0][0];
 
             //Extracting the name
             while(c != '='){
-                var[count].name[i++] = c;
+                name_buffer[i++] = c;
                 c = args[0][i];
             }
-
-            i++;//DISCARD '='
+            //Discard '='
+            i++;
 
             c = args[0][i];
 
             //Discard leading character
-            if(c == '\"' || c == '\''){
-                i++;
-                c = args[0][i];
-            }
-
+            if(c == '\"' || c == '\'')
+                c = args[0][++i];
+            
             //Extracting the assigned value
             while(i < strlen(args[0])){
                 
-                var[count].value[j++] = c;
+                value_buffer[j++] = c;
                 c = args[0][++i];
+            }   
+
+            j=0;
+            while(j < count){
+                //Check if the variable alrady exists
+                if(!strcmp(var[j].name,name_buffer)){
+                    //Replace the old value with the new
+                    strcpy(var[j].value,value_buffer);
+                    return 0;
+                }
+                j++;
             }
-            printf("Name:%s Variable:%s\n",var[count].name,var[count].value);
+            
+            //Create new variable if it doesn't already exist
+            strcpy(var[count].name,name_buffer);
+            strcpy(var[count].value,value_buffer);
             count++;
             return 0;
     }
+
     //Wrong syntax
     return -1;
 }
@@ -291,7 +307,7 @@ int check_variable(char** args){
 *   - prev_return : the previous return value of the foreground command
 *   - prev_pid : the previous pid of the background pipeline
 *
-* RETURN : 0 if replaced a variable, 1 otherwise
+* RETURN : 0 if replaced a variable, -1 if it doesn't exist, 1 otherwise
 *
 *******************************************************************************************/
 int manage_dollar(char** args, int prev_return, int prev_pid){
@@ -313,13 +329,15 @@ int manage_dollar(char** args, int prev_return, int prev_pid){
             return 0;
         }
         else{
-            //For all arguments
             int cnt = 0;
+            char buffer[256] = "";
+            int k = 0;
+            
+            //For all arguments
             for(int j = 0; j < strlen(args[i]);j++){
                 //Check if any of them contain $
                 if(args[i][j] == '$'){
-                    char buffer[256] = "";
-                    int k = 0;
+
                     j++; //Don't take $
 
                     //Extract the following variable name
@@ -327,17 +345,25 @@ int manage_dollar(char** args, int prev_return, int prev_pid){
                         buffer[k++] = args[i][j++]; 
                     }
 
+                    //Removing '\"'
+                    char* ptr = strchr(buffer,'\"');
+                    if(ptr != NULL) 
+                        *ptr = 0;
+                    
                     //Check if this name exists in the database
-                    while(var[cnt].name != NULL){
+                    while(!strcmp(var[cnt].name,"") == false){
                         if(!strcmp(var[cnt].name,buffer) == true){
                             //Replace the argument with the stored variable
                             args[i] = var[cnt].value; 
-                            //printf("args[%d]=%s",i,args[i]);
                             return 0; //Exit the function
                         }
+
                         cnt++;
-                    
                     }
+
+                    memset(args[i],0,sizeof(args[i]));
+                    //The variable doesn't exist
+                    return -1;
                 }
             }
         }
@@ -427,7 +453,10 @@ int main(int argc, char** argv){
         }
 
         //Replace $!, $? or $variable by the corresponding term
-        manage_dollar(args,prev_return, prev_pid);
+        if(manage_dollar(args,prev_return, prev_pid) == -1){
+            print_failure("1", &prev_return);
+            continue;
+        }
 
         
 
@@ -675,7 +704,7 @@ int main(int argc, char** argv){
                 //Setting the new IP address
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
 
-                    perror("Couldn't set the address");
+                    perror("Couldn't set the address. NOTE: must be in super used mode");
                     print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
@@ -687,7 +716,7 @@ int main(int argc, char** argv){
                 //Setting the mask
                 if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
 
-                    perror("Couldn't set the mask");
+                    perror("Couldn't set the mask. NOTE: must be in super used mode");
                     print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
