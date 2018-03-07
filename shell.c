@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
@@ -25,7 +26,7 @@ int split_line(char* line, char** args);
 int get_paths(char** paths);
 void convert_whitespace_dir(char** args);
 bool find_in_file(const char* path, char* searched_str, char** output_str, int nummer);
-void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid);
+int manage_dollar(char** args, int prev_return, int prev_pid);
 int check_variable(char** args);
 
 
@@ -35,6 +36,9 @@ struct variable{
     char name[256];
     char value[256];
 };
+//Structure saving previous variables
+static struct variable var[256];
+static int count = 0;
 
 
 /*************************************split_line*****************************************
@@ -213,10 +217,10 @@ bool find_in_file(const char* path, char* searched_str, char** output_str, int n
 * Check if one tries to assign a variable. If so, store it.
 *
 * ARGUMENT :
-*   - path : arguments entered as a command
+*   - args : arguments entered as a command
 
 *
-* RETURN : 0 if succesful, -1 otherwise.
+* RETURN : 1 if no assignement, 0 if assignement successfull, -1 if unsuccessful
 *
 *******************************************************************************************/
 int check_variable(char** args){
@@ -224,47 +228,71 @@ int check_variable(char** args){
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
 
-    //Copy the value of args[0] to not lose the variable across calls
-    char args_copy[256] = "";
-    strcpy(args_copy,args[0]);
-
-    //Structure saving previous variables
-    static struct variable var[256];
-    static int count = 0;
+    //No variable assignement
+    if(ptr == NULL){
+        return 1; 
+    }
 
     //Checking that '=' is surrounded by something
-    if(ptr != NULL && ptr+1 != NULL && ptr-1 != NULL) {
-        //Checking that there is nothing following
-        if(args[1] == NULL){
-            char buffer[256];
+    if(ptr+1 != NULL && ptr-1 != NULL) {
+            
+            if(args[1] != NULL){
+                convert_whitespace_dir(args);
+                //Concatenate the two strings
+                char tmp[256];
+                strcpy(tmp,args[1]);
+                strcat(args[0]," ");
+                strcat(args[0],tmp);
+            }
+            
 
             int i = 0;
+            int j = 0;
+            char name_buffer[256];
+            char value_buffer[256];
             char c = args[0][0];
 
             //Extracting the name
             while(c != '='){
-
-                var[count].name[i++] = c;
+                name_buffer[i++] = c;
                 c = args[0][i];
             }
-
+            //Discard '='
             i++;
+
+            c = args[0][i];
+
+            //Discard leading character
+            if(c == '\"' || c == '\'')
+                c = args[0][++i];
+            
             //Extracting the assigned value
             while(i < strlen(args[0])){
                 
-                c = args[0][i];
-                var[count].value[i++] = c;
+                value_buffer[j++] = c;
+                c = args[0][++i];
+            }   
+
+            j=0;
+            while(j < count){
+                //Check if the variable alrady exists
+                if(!strcmp(var[j].name,name_buffer)){
+                    //Replace the old value with the new
+                    strcpy(var[j].value,value_buffer);
+                    return 0;
+                }
+                j++;
             }
+            
+            //Create new variable if it doesn't already exist
+            strcpy(var[count].name,name_buffer);
+            strcpy(var[count].value,value_buffer);
             count++;
-
-
-        }
-        else
-            return -1;
-        
+            return 0;
     }
 
-    return 0;
+    //Wrong syntax
+    return -1;
 }
 
 
@@ -276,31 +304,71 @@ int check_variable(char** args){
 *
 * ARGUMENT :
 *   - args : an array containing all the args of the line  entered by the user
-*   - nb_args : the number of arguments
 *   - prev_return : the previous return value of the foreground command
 *   - prev_pid : the previous pid of the background pipeline
 *
-* RETURN : /
+* RETURN : 0 if replaced a variable, -1 if it doesn't exist, 1 otherwise
 *
 *******************************************************************************************/
-void manage_dollar(char** args, int nb_args, int prev_return, int prev_pid){
+int manage_dollar(char** args, int prev_return, int prev_pid){
 
     //Check all the arguments and replace the dollar signs by their value
-    for(int i=0; i < nb_args; i++){
+    for(int i=0; args[i] != NULL; i++){
 
         if(!strcmp(args[i], "$?")){
             snprintf(args[i], 256, "%d", prev_return);
+            return 0;
         }
 
-        if(!strcmp(args[i], "$!")){
+        else if(!strcmp(args[i], "$!")){
 
             if(prev_pid != 0)
                 snprintf(args[i], 256, "%d", prev_pid);
             else
                 args[i] = NULL;
+            return 0;
+        }
+        else{
+            int cnt = 0;
+            char buffer[256] = "";
+            int k = 0;
+            
+            //For all arguments
+            for(int j = 0; j < strlen(args[i]);j++){
+                //Check if any of them contain $
+                if(args[i][j] == '$'){
+
+                    j++; //Don't take $
+
+                    //Extract the following variable name
+                    while(j < strlen(args[i])) {
+                        buffer[k++] = args[i][j++]; 
+                    }
+
+                    //Removing '\"'
+                    char* ptr = strchr(buffer,'\"');
+                    if(ptr != NULL) 
+                        *ptr = 0;
+                    
+                    //Check if this name exists in the database
+                    while(!strcmp(var[cnt].name,"") == false){
+                        if(!strcmp(var[cnt].name,buffer) == true){
+                            //Replace the argument with the stored variable
+                            args[i] = var[cnt].value; 
+                            return 0; //Exit the function
+                        }
+
+                        cnt++;
+                    }
+
+                    memset(args[i],0,sizeof(args[i]));
+                    //The variable doesn't exist
+                    return -1;
+                }
+            }
         }
     }
-
+    return 1;
 }
 
 
@@ -362,14 +430,25 @@ int main(int argc, char** argv){
         int nb_args = split_line(line, args);
 
         //Check if the user enters a variable
-        if(check_variable(args) == -1){
+        int result = check_variable(args);
+        //Syntax error during assignement
+        if(result == -1){
             print_failure("1", &prev_return);
+            continue;
+        }//We stored a variable in our database
+        else if(result == 0){
+            printf("0");
             continue;
         }
 
 
-        //Replace $! or $? by the corresponding term
-        manage_dollar(args, nb_args,prev_return, prev_pid);
+        //Replace $!, $? or $variable by the corresponding term
+        if(manage_dollar(args,prev_return, prev_pid) == -1){
+            print_failure("1", &prev_return);
+            continue;
+        }
+
+        
 
 
         //The command is cd
@@ -615,7 +694,7 @@ int main(int argc, char** argv){
                 //Setting the new IP address
                 if(ioctl(socket_desc, SIOCSIFADDR, &my_ifreq) == -1){
 
-                    perror("Couldn't set the address");
+                    perror("Couldn't set the address. NOTE: must be in super used mode");
                     print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
@@ -627,7 +706,7 @@ int main(int argc, char** argv){
                 //Setting the mask
                 if(ioctl(socket_desc, SIOCSIFNETMASK, &my_ifreq) == -1){
 
-                    perror("Couldn't set the mask");
+                    perror("Couldn't set the mask. NOTE: must be in super used mode");
                     print_failure("1", &prev_return);
                     close(socket_desc);
                     continue;
@@ -714,7 +793,7 @@ int main(int argc, char** argv){
         else{
             prev_pid = waitpid(-1, &status,0)
             prev_return = WEXITSTATUS(status);
-            printf("%d",prev_return); 
+            printf("%d",prev_return);
         }
 
     }
