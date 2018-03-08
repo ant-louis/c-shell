@@ -20,11 +20,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
+#define IS_COMMAND 1
+#define IS_VARIABLE 0
 /*************************************Prototypes*********************************************/
 int split_line(char* line, char** args);
 int get_paths(char** paths);
-void convert_whitespace_dir(char** args);
+void remove_delimiters(char** args,int type);
 bool find_in_file(const char* path, char* searched_str, char** output_str, int number);
 int manage_dollar(char** args, int prev_return, int prev_pid);
 int check_variable(char** args);
@@ -101,32 +102,33 @@ int get_paths(char** paths) {
 
 
 
-/*************************************convert_whitespace_dir************************************
+/*************************************remove_delimiters************************************
 *
-* Convert a directory/folder with special characters to a directory/folder with whitespaces
+* Convert a string with special characters to a directory/folder with whitespaces
 *
 * ARGUMENT :
 *   - args : an array containing all the args of the line  entered by the user
-*
+*   - type : IS_COMMAND or IS_VARIABLE
 * RETURN : /
 *
-* NB: it will clear all args except args[0] and args[1]
+* NB: it will clear all args except args[0] and args[1], the latter containing the concatenation
+*       of all the following arguments, without delimiters
 *
 *******************************************************************************************/
-void convert_whitespace_dir(char** args){
+void remove_delimiters(char** args, int type){
 
-    int j=1;
+    //Start at 
+    int j=type;
+
     char path[256];
     strcpy(path,"");
     char* token;
     char delimiters[] = "\"\'\\";
 
-
     while(args[j] != NULL){
 
         //Get the first token delimited by one of the delimiters
         token = strtok(args[j], delimiters);
-
 
         while(token != NULL){
             //Add this token to the path
@@ -148,7 +150,10 @@ void convert_whitespace_dir(char** args){
     memset(&args[2], 0, sizeof(args)-2);
     
     //Copy the path to the unique argument of cd
-    strcpy(args[1], path);
+    //if(!strcmp(args[0],"cd")){
+        strcpy(args[1], path);
+
+    //}
 }
 
 
@@ -236,58 +241,32 @@ int check_variable(char** args){
     //Checking that '=' is surrounded by something
     if(ptr+1 != NULL && ptr-1 != NULL) {
             
+            char* name;
+            char* value;
+
+            //Value is surrouned by quotes
             if(args[1] != NULL){
-                convert_whitespace_dir(args);
-                //Concatenate the two strings
-                char tmp[256];
-                strcpy(tmp,args[1]);
-                strcat(args[0]," ");
-                strcat(args[0],tmp);
+                remove_delimiters(args,IS_VARIABLE);
+                name = strtok(args[1],"=");
+            }else{
+                name = strtok(args[0],"=");
             }
             
-
-            int i = 0;
-            int j = 0;
-            char name_buffer[256];
-            char value_buffer[256];
-            char c = args[0][0];
-
             //Extracting the name
-            while(c != '='){
-                name_buffer[i++] = c;
-                c = args[0][i];
-            }
+            value = strtok(NULL, "");
 
-            //Discard '='
-            i++;
-
-            c = args[0][i];
-
-            //Discard leading character
-            if(c == '\"' || c == '\'')
-                c = args[0][++i];
-            
-            //Extracting the assigned value
-            while(i < strlen(args[0])){
-                
-                value_buffer[j++] = c;
-                c = args[0][++i];
-            }   
-
-            j=0;
-            while(j < count){
-                //Check if the variable alrady exists
-                if(!strcmp(var[j].name,name_buffer)){
+            //Check if the variable alrady exists
+            for(int j=0;j < count;j++){
+                if(!strcmp(var[j].name,name)){
                     //Replace the old value with the new
-                    strcpy(var[j].value,value_buffer);
+                    strcpy(var[j].value,value);
                     return 0;
                 }
-                j++;
             }
             
             //Create new variable if it doesn't already exist
-            strcpy(var[count].name,name_buffer);
-            strcpy(var[count].value,value_buffer);
+            strcpy(var[count].name,name);
+            strcpy(var[count].value,value);
             count++;
             return 0;
     }
@@ -475,7 +454,7 @@ int main(int argc, char** argv){
             */
             if(nb_args > 2){ //Means that there is/are (a) folder(s) with whitespace
 
-                convert_whitespace_dir(args);
+                remove_delimiters(args,IS_COMMAND);
             }
 
             int ret = chdir(args[1]);
@@ -763,7 +742,7 @@ int main(int argc, char** argv){
                   we need to change this directory in something understandable for the shell*/
                 if(nb_args > 2){
                     if(args[1][0] == '\"' || args[1][0] == '\'' || args[1][strlen(args[1])-1] == '\\')
-                        convert_whitespace_dir(args);
+                        remove_delimiters(args,IS_COMMAND);
                 }
 
                 //If executable, don't need to add path
