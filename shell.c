@@ -731,7 +731,13 @@ int main(int argc, char** argv){
 
         }  
 
-
+        //Check arguments before calling
+       /* int i = 0;
+        while(args[i] != NULL){
+            printf("args[%d]: %s\n",i,args[i]);
+            i++;
+        }
+*/
         //The command isn't a built-in command
         pid = fork();
 
@@ -766,22 +772,33 @@ int main(int argc, char** argv){
                         convert_whitespace_dir(args);
                 }
 
-                //Taking a path from paths[] and concatenating with the command
-                for(j = 0; j < nb_paths; j++){
-                    char path[256] = "";
-                    strcat(path,paths[j]);
-                    strcat(path,"/");
-                    strcat(path,args[0]);
-                
-                    //Check if path contains the command to execute
-                    if(access(path,X_OK) == 0){
+                //If executable, don't need to add path
+                if(args[0][0] == '.'){
+                    if(execv(args[0],args) == -1){
+                        perror("Instruction failed");
+                        print_failure("-1", &prev_return);
+                    }
+                    break;    
+                    
+                }
+                else{           
+                    //Taking a path from paths[] and concatenating with the command
+                    for(j = 0; j < nb_paths; j++){
+                        char path[256] = "";
+                        strcat(path,paths[j]);
+                        strcat(path,"/");
+                        strcat(path,args[0]);
+                    
+                        //Check if path contains the command to execute
+                        if(access(path,X_OK) == 0){
 
-                        if(execv(path,args) == -1){
-                            perror("Instruction failed");
-                            print_failure("-1", &prev_return);
+                            if(execv(path,args) == -1){
+                                perror("Instruction failed");
+                                print_failure("-1", &prev_return);
+                            }
+                            
+                            break;
                         }
-                        
-                        break;
                     }
                 }
             }
