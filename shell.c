@@ -667,8 +667,6 @@ int main(int argc, char** argv){
                 //Creating an interface structure
                 struct ifreq my_ifreq; 
                 
-                //Creating an address structure;
-                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
 
                 //Check that the ifr_name is big enough
                 if (length_if_name < IFNAMSIZ){ 
@@ -684,6 +682,8 @@ int main(int argc, char** argv){
                     close(socket_desc);
                     continue;
                 }
+                //Creating an address structure;
+                struct sockaddr_in* address_struct = (struct sockaddr_in*)&my_ifreq.ifr_addr;
 
                 // Converting from string to address structure
                 inet_pton(AF_INET, address, &address_struct->sin_addr);
@@ -697,7 +697,7 @@ int main(int argc, char** argv){
                     continue;
                 }
 
-                //Creating an address structure;
+                //Creating a mask structure;
                 struct sockaddr_in* mask_struct = (struct sockaddr_in*)&my_ifreq.ifr_netmask;
 
                 // Converting from string to mask structure
