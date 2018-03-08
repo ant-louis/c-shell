@@ -754,7 +754,6 @@ int main(int argc, char** argv){
             if(args[0][0] == '/'){
                 if(execv(args[0],args) == -1){
                     perror("Instruction failed");
-                    print_failure("-1", &prev_return);
                 }
             }
 
@@ -776,7 +775,6 @@ int main(int argc, char** argv){
                 if(args[0][0] == '.'){
                     if(execv(args[0],args) == -1){
                         perror("Instruction failed");
-                        print_failure("-1", &prev_return);
                     }
                     break;    
                     
@@ -794,7 +792,6 @@ int main(int argc, char** argv){
 
                             if(execv(path,args) == -1){
                                 perror("Instruction failed");
-                                print_failure("-1", &prev_return);
                             }
                             
                             break;
