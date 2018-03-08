@@ -810,7 +810,7 @@ int main(int argc, char** argv){
         else{
             prev_pid = waitpid(-1, &status,0);
             prev_return = WEXITSTATUS(status);
-            printf("%d",prev_return);
+            printf("\n%d",prev_return);
         }
 
     }
