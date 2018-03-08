@@ -352,7 +352,7 @@ int manage_dollar(char** args, int prev_return, int prev_pid){
                     
                     //Check if this name exists in the database
                     while(!strcmp(var[cnt].name,"") == false){
-                        if(!strcmp(var[cnt].name,buffer) == true){
+                        if((!strcmp(var[cnt].name,buffer)) == true){
                             //Replace the argument with the stored variable
                             args[i] = var[cnt].value; 
                             return 0; //Exit the function
@@ -648,8 +648,8 @@ int main(int argc, char** argv){
 
 
                 //Interface name and length
-                char* dev = args[3]; 
-                size_t length_if_name= strlen(dev); 
+                char* name = args[3]; 
+                size_t length_if_name= strlen(name); 
 
                 char* address = args[4];
                 char* mask = args[5];
@@ -666,12 +666,13 @@ int main(int argc, char** argv){
 
                 //Creating an interface structure
                 struct ifreq my_ifreq; 
-                
+                my_ifreq.ifr_addr.sa_family = AF_INET;
+
 
                 //Check that the ifr_name is big enough
                 if (length_if_name < IFNAMSIZ){ 
                     //Set the name of the interface you want to look at
-                    memcpy(my_ifreq.ifr_name,dev,length_if_name);
+                    memcpy(my_ifreq.ifr_name,name,length_if_name);
                     //End the name with terminating char
                     my_ifreq.ifr_name[length_if_name]=0;
 
@@ -796,7 +797,9 @@ int main(int argc, char** argv){
                             
                             break;
                         }
+
                     }
+                    printf("Command does not exist\n");
                 }
             }
             
