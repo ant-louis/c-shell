@@ -257,6 +257,7 @@ int check_variable(char** args){
                 name_buffer[i++] = c;
                 c = args[0][i];
             }
+
             //Discard '='
             i++;
 
@@ -360,8 +361,8 @@ int manage_dollar(char** args, int prev_return, int prev_pid){
 
                         cnt++;
                     }
-
-                    memset(args[i],0,sizeof(args[i]));
+                    //Clean arguments
+                    memset(&args[i],0,sizeof(args[i]));
                     //The variable doesn't exist
                     return -1;
                 }
@@ -732,13 +733,6 @@ int main(int argc, char** argv){
 
         }  
 
-        //Check arguments before calling
-       /* int i = 0;
-        while(args[i] != NULL){
-            printf("args[%d]: %s\n",i,args[i]);
-            i++;
-        }
-*/
         //The command isn't a built-in command
         pid = fork();
 
