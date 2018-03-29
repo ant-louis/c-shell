@@ -2,7 +2,7 @@
 *
 * Antoine Louis & Tom Crasset
 *
-* Operating systems : Projet 2 - shell with built-in's
+* Operating systems : Projet 4
 *******************************************************************************************/
 
 #include <sys/types.h> 
@@ -37,6 +37,19 @@ struct variable{
     char name[256];
     char value[256];
 };
+
+
+struct pfstat {
+int stack_low; //Number of times the stack was expanded after a page fault
+int transparent_hugepage_fault; //Number of huge page transparent PMD fault
+int anonymous_fault; //Normal anonymous page fault
+int file_fault; //Normal file-backed page fault
+int swapped_back; //Number of fault that produced a read-from swap to put back the page online
+int copy_on_write; //Number of fault which backed a copy-on-write
+int fault_alloced_page; //Number of normal pages allocated due to a page fault
+};
+
+
 //Structure saving previous variables
 static struct variable var[256];
 static int count = 0;
@@ -232,14 +245,15 @@ int check_variable(char** args){
 
     //Get a pointer starting at the '='
     char* ptr = strchr(args[0],'=');
-
-    //No variable assignement
-    if(ptr == NULL){
+    //No = in the argument
+    if(ptr == NULL)
         return 1; 
-    }
+
+    //Point to char after =
+    ptr--;
 
     //Checking that '=' is surrounded by something
-    if(ptr+1 != NULL && ptr-1 != NULL) {
+    if(ptr[0] != '\0') {
             
             char* name;
             char* value;
@@ -249,17 +263,25 @@ int check_variable(char** args){
                 remove_delimiters(args,IS_VARIABLE);
                 name = strtok(args[1],"=");
             }else{
+                //Extracting the name
                 name = strtok(args[0],"=");
             }
-            
-            //Extracting the name
-            value = strtok(NULL, "");
 
+            //If there is nothing after =
+            if(ptr[2] == '\0')
+                value = " ";
+            else{
+                //Extracting the value
+                value = strtok(NULL, "");
+            }
+            
+            
             //Check if the variable alrady exists
-            for(int j=0;j < count;j++){
+            int j;
+            for(j=0;j < count;j++){
                 if(!strcmp(var[j].name,name)){
                     //Replace the old value with the new
-                    strcpy(var[j].value,value);
+                    strcpy(var[j].value, value);
                     return 0;
                 }
             }
@@ -268,12 +290,48 @@ int check_variable(char** args){
             strcpy(var[count].name,name);
             strcpy(var[count].value,value);
             count++;
+
             return 0;
     }
-
-    //Wrong syntax
-    return -1;
+    return 1;
 }
+
+
+
+
+/*************************************replace_str*****************************************
+*
+* Replace a substring in a string by another
+*
+* ARGUMENT :
+*   - str : the entire string
+*   - orig : the substring to replace
+*   - rep : the new substring
+*
+* RETURN : the new string with replacement
+*
+*******************************************************************************************/
+char *replace_str(char *str, char *orig, char* rep){
+
+  char temp[4096];
+  char buffer[4096];
+  char *p;
+
+  strcpy(temp, str);
+
+  if(!(p = strstr(temp, orig)))  // Is 'orig' even in 'temp'?
+    return str;
+
+  strncpy(buffer, temp, p-temp); // Copy characters from 'temp' start to 'orig'
+  buffer[p-temp] = '\0';
+
+  sprintf(buffer + (p - temp), "%s%s", rep, p + strlen(orig));
+  sprintf(str, "%s", buffer);    
+
+  return str;
+}
+
+
 
 
 /*************************************manage_dollar*****************************************
@@ -292,64 +350,59 @@ int check_variable(char** args){
 *******************************************************************************************/
 int manage_dollar(char** args, int prev_return, int prev_pid){
 
+    char value[12];
+    int i, j;
+
     //Check all the arguments and replace the dollar signs by their value
-    for(int i=0; args[i] != NULL; i++){
+    for(i=0; args[i] != NULL; i++){
 
-        if(!strcmp(args[i], "$?")){
-            snprintf(args[i], 256, "%d", prev_return);
-            return 0;
-        }
+         //Get a pointer starting at the '$'
+        char* ptr = strchr(args[i],'$');
 
-        else if(!strcmp(args[i], "$!")){
+        if(ptr != NULL){
 
-            if(prev_pid != 0)
-                snprintf(args[i], 256, "%d", prev_pid);
-            else
-                args[i] = NULL;
-            return 0;
-        }
-        else{
-            int cnt = 0;
-            char buffer[256] = "";
-            int k = 0;
-            
-            //For all arguments
-            for(int j = 0; j < strlen(args[i]);j++){
-                //Check if any of them contain $
-                if(args[i][j] == '$'){
-
-                    j++; //Don't take $
-
-                    //Extract the following variable name
-                    while(j < strlen(args[i])) {
-                        buffer[k++] = args[i][j++]; 
-                    }
-
-                    //Removing '\"'
-                    char* ptr = strchr(buffer,'\"');
-                    if(ptr != NULL) 
-                        *ptr = 0;
-                    
-                    //Check if this name exists in the database
-                    while(!strcmp(var[cnt].name,"") == false){
-                        if((!strcmp(var[cnt].name,buffer)) == true){
-                            //Replace the argument with the stored variable
-                            args[i] = var[cnt].value; 
-                            return 0; //Exit the function
-                        }
-
-                        cnt++;
-                    }
-                    //Clean arguments
-                    memset(&args[i],0,sizeof(args[i]));
-                    //The variable doesn't exist
-                    return -1;
-                }
+            //Case $?
+            if(!strcmp(ptr+1, "?")){
+                sprintf(value,"%d",prev_return);
+                args[i] = replace_str(args[i], "$?", value);
+                return 0;
             }
+
+            //Case $!
+            else if(!strcmp(ptr+1,"!")){
+
+                if(prev_pid != 0){
+                    sprintf(value,"%d",prev_pid);
+                    args[i] = replace_str(args[i], "$!", value);
+                }
+                else
+                    *ptr = '\0';
+                return 0;
+
+            }
+                 
+            //Case $var
+            else{
+                
+                //Check if the variable alrady exists
+                for(j=0;j < count;j++){
+                    if(!strcmp(var[j].name,ptr+1)){
+                        args[i] = replace_str(args[i], ptr, var[j].value);
+                        return 0;
+                    }
+                }
+                //Clean arguments
+                memset(&args[i],0,sizeof(args[i]));
+                //The variable doesn't exist
+                return -1;
+
+             }
         }
     }
     return 1;
 }
+
+
 
 
 /*************************************print_failure*****************************************
@@ -375,8 +428,8 @@ void print_failure(char* return_nb, int* prev_return){
 int main(int argc, char** argv){
 
     bool stop = false;
-    int prev_return;
-    int prev_pid;
+    int prev_return = 0;
+    int prev_pid = 0;
 
     char line[65536]; 
     char* args[256];
@@ -386,11 +439,17 @@ int main(int argc, char** argv){
     
     char* output_str = NULL;
 
+    bool is_background = false;
+    int nb_background = 0;
+    int background_pid = 0;
+
+
     while(!stop){
 
-        //Clear the variables
+        //Reset all the variables
         strcpy(line,"");
         memset(args, 0, sizeof(args));
+        is_background = false;
 
         //Prompt
         printf("> ");
@@ -409,28 +468,31 @@ int main(int argc, char** argv){
         //User enters a line 
         int nb_args = split_line(line, args);
 
-        //Check if the user enters a variable
-        int result = check_variable(args);
-        //Syntax error during assignement
-        if(result == -1){
+
+        //Check if command line is followed by &
+        if(!strcmp(args[nb_args-1], "&")){
+            is_background = true;
+            nb_background++;
+            args[--nb_args] = NULL;
+        }
+
+
+
+        //Replace $!, $? or $variable by the corresponding term
+        if(manage_dollar(args, prev_return, prev_pid) == -1){
+            printf("ERROR\n");
             print_failure("1", &prev_return);
             continue;
-        }//We stored a variable in our database
-        else if(result == 0){
+        }
+
+
+        //Check if the user enters a variable
+        if(check_variable(args) == 0){
             printf("0");
             continue;
         }
 
-
-        //Replace $!, $? or $variable by the corresponding term
-        if(manage_dollar(args,prev_return, prev_pid) == -1){
-            print_failure("1", &prev_return);
-            continue;
-        }
-
         
-
-
         //The command is cd
         if(!strcmp(args[0], "cd")){
 
@@ -704,6 +766,38 @@ int main(int argc, char** argv){
 
             }
 
+            else if((args[1]!=NULL && args[2] != NULL) && (!strcmp(args[1], "pfstat"))){
+                struct pfstat* pfstat = malloc(sizeof(struct pfstat*));
+               
+                int returncode = syscall(326, atoi(args[2]), pfstat);
+                if(returncode == 1){
+                    perror("PID is not valid.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else if(returncode == 2){
+                    perror("Pfstat pointer is not valid.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else{
+                    printf("stack_low %d\n", pfstat->stack_low);
+                    printf("transparent_hugepage_fault %d\n",  pfstat->transparent_hugepage_fault);
+                    printf("anonymous_fault %d\n",  pfstat->anonymous_fault);
+                    printf("file_fault %d\n",  pfstat->file_fault);
+                    printf("swapped_back %d\n",  pfstat->swapped_back);
+                    printf("copy_on_write %d\n",  pfstat->copy_on_write);
+                    printf("fault_alloced_page %d\n",  pfstat->fault_alloced_page);
+                    printf("0");
+                }
+                free(pfstat);
+            }
+
             //In all other cases, error
             else{
                 print_failure("1", &prev_return);
@@ -781,11 +875,29 @@ int main(int argc, char** argv){
 
         //This is the father
         else{
-            prev_pid = waitpid(-1, &status,0);
-            prev_return = WEXITSTATUS(status);
-            printf("\n%d",prev_return);
-        }
 
+            if(!is_background){
+
+                int i;
+                for(i=0; i < nb_background; i++){
+                    background_pid = waitpid(-1, &status,WNOHANG);
+                    //If a child has exited
+                    if(background_pid > 0){
+                        nb_background--;
+                    }
+                }
+
+                waitpid(-1, &status,0);
+                prev_return = WEXITSTATUS(status);
+                printf("\n%d",prev_return);
+
+            }
+            else{
+                prev_pid = pid;
+                printf("%d\n", prev_pid);
+            }
+
+        }
     }
 
     return 0;
