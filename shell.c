@@ -820,6 +820,9 @@ int main(int argc, char** argv){
         	int returncode;
         	char cwd[2048];
         	int fd;
+        	uint32_t attr = 0;
+        	uint16_t new_pw;
+        	uint16_t curr_pw;
 
         	//Get the current directory
         	if (getcwd(cwd, sizeof(cwd)) == NULL){
@@ -836,10 +839,10 @@ int main(int argc, char** argv){
         		fd = open(args[2], O_RDWR, 0666);
 
         		if(!strcmp(args[1], "hide")){
-        			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, 0);
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, &attr);
         		}
         		else if(!strcmp(args[1], "unhide")){
-        			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, 0);
+        			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, &attr);
         		}
 
         		if(returncode < 0){
@@ -855,8 +858,9 @@ int main(int argc, char** argv){
         			&& (args[2]!=NULL)){
 
         		fd = open(cwd, O_RDWR, 0666);
+        		curr_pw = (uint16_t) atoi(args[2]);
 
-        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, atoi(args[2]));
+        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
 
         		if(returncode == 1){
         			perror("Permission denied.");
@@ -875,7 +879,7 @@ int main(int argc, char** argv){
 
         		fd = open(cwd, O_RDWR, 0666);
 
-        		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, 0);
+        		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
         	}
 
         	//fat password [current_password] [new_password]
@@ -886,19 +890,22 @@ int main(int argc, char** argv){
 
         		//If no password set yet, give a first one
         		if(args[3]==NULL){
-        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD);
+        			new_pw = (uint16_t) atoi(args[2]);
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &new_pw);
         		}
         		//Check that the password is 4 characters 
-        		else if(strlen(args[3]) != 4 || atoi(args[3] == -1)){
+        		else if(atoi(args[3]) < 0 || atoi(args[3]) > 10000){
         			perror("Password must be at most 4 numbers.");
                     print_failure("1", &prev_return);
                     continue;
         		}
         		//Change current password
         		else{
-        			returncode = ioctl(open(args[2], O_RDWR, 0666), FAT_IOCTL_SET_PASSWORD);
+        			curr_pw = (uint16_t) atoi(args[2]);
+        			new_pw = (uint16_t) atoi(args[3]);
+        			attr = new_pw << 16 | curr_pw;
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
 
-        			strtoul()
         		}
 
         		//Check returncode
