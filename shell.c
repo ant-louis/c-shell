@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 #include <linux/msdos_fs.h>
+//#include <linux/fs/fat/fat.h>
 
 
 #define IS_COMMAND 1
@@ -830,6 +831,12 @@ int main(int argc, char** argv){
         		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
         		&& (args[2]!=NULL)){
 
+        		if(!strcmp(args[1], "hide")){
+        			fat_ioctl_set_protected(open(args[2]));
+        		}
+        		else if(!strcmp(args[1], "unhide")){
+        			fat_ioctl_set_unprotected(open(args[2]));
+        		}
 
         	}
 
