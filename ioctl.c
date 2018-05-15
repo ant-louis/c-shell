@@ -138,7 +138,6 @@ static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
 	if (err)
 		goto out;
 	
-
 	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
 		fat_msg(sb, KERN_ERR, "unable to read boot sector "
@@ -149,8 +148,8 @@ static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
 	
 	fbs = (struct fat_boot_sector *) bh->b_data;
 
-	//Check the password
-	if(fbs->hidden == pw){
+	//Check the password : ok if password corresponds or if no password set
+	if((fbs->hidden == pw) || (fbs->hidden == 0 && pw == 0)){
 		//The password is valid, so unlock everything
 		sbi->unlock = 1;
 		err = 0;

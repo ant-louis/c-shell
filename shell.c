@@ -23,7 +23,6 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 #include <linux/msdos_fs.h>
-#include <linux/fs/fat/fat.h>
 
 
 #define IS_COMMAND 1
@@ -817,26 +816,29 @@ int main(int argc, char** argv){
         //The command is fat
         else if(!strcmp(args[0], "fat")){
 
-        	int returncode;
-        	char cwd[2048];
-        	int fd;
         	uint32_t attr = 0;
         	uint16_t new_pw;
         	uint16_t curr_pw;
-
+        	int returncode;
+        	int fd;
+        	char cwd[2048];
+        	
         	//Get the current directory
         	if (getcwd(cwd, sizeof(cwd)) == NULL){
         		perror("Error in getting the current directory.");
                 print_failure("1", &prev_return);
                 continue;
-        	}		       
+        	}
+
+        	//File descriptor of current directory
+        	fd = open(cwd, O_RDONLY);       
 		       
         	//fat hide-unhide /path/to/file
         	if ((args[1]!=NULL) 
         		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
         		&& (args[2]!=NULL)){
 
-        		fd = open(args[2], O_RDWR, 0666);
+        		fd = open(args[2], O_RDONLY);
 
         		if(!strcmp(args[1], "hide")){
         			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, &attr);
@@ -854,14 +856,23 @@ int main(int argc, char** argv){
         	}
 
         	//fat unlock [currrent_password]
-        	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))
-        			&& (args[2]!=NULL)){
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))){
 
-        		fd = open(cwd, O_RDWR, 0666);
-        		curr_pw = (uint16_t) atoi(args[2]);
+        		if(args[2] == NULL){
+        			returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &attr);
+        		}
+        		else{
+        			curr_pw = (uint16_t) atoi(args[2]);
 
-        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
+	        		if(curr_pw < 0 || curr_pw > 10000){
+	        			perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+	        		}
 
+	        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
+        		}
+        		
         		if(returncode == 1){
         			perror("Permission denied.");
                     print_failure("1", &prev_return);
@@ -877,8 +888,6 @@ int main(int argc, char** argv){
         	//fat lock
         	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
 
-        		fd = open(cwd, O_RDWR, 0666);
-
         		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
         	}
 
@@ -886,28 +895,34 @@ int main(int argc, char** argv){
         	else if((args[1]!=NULL) && (!strcmp(args[1], "password"))
         			&& (args[2]!=NULL)){
 
-        		fd = open(cwd, O_RDWR, 0666);
-
         		//If no password set yet, give a first one
         		if(args[3]==NULL){
         			new_pw = (uint16_t) atoi(args[2]);
+
+        			if(new_pw < 0 || new_pw > 9999){
+        				perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+        			}
+
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &new_pw);
         		}
-        		//Check that the password is 4 characters 
-        		else if(atoi(args[3]) < 0 || atoi(args[3]) > 10000){
-        			perror("Password must be at most 4 numbers.");
-                    print_failure("1", &prev_return);
-                    continue;
-        		}
+
         		//Change current password
         		else{
         			curr_pw = (uint16_t) atoi(args[2]);
         			new_pw = (uint16_t) atoi(args[3]);
-        			attr = new_pw << 16 | curr_pw;
+
+        			if(curr_pw < 0 || curr_pw > 9999 || new_pw < 0 || new_pw > 9999){
+        				perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+        			}
+
+        			attr = (new_pw << 16) | curr_pw;
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
-
         		}
-
+        		
         		//Check returncode
         		if(returncode == 1){
         			perror("A password is already set.");
@@ -1027,6 +1042,7 @@ int main(int argc, char** argv){
 
         }
     }
+}
 
     return 0;
 }
