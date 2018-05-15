@@ -149,7 +149,7 @@ static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
 	fbs = (struct fat_boot_sector *) bh->b_data;
 
 	//Check the password : ok if password corresponds or if no password set
-	if((fbs->hidden == pw) || (fbs->hidden == 0 && pw == 0)){
+	if(fbs->hidden == pw){
 		//The password is valid, so unlock everything
 		sbi->unlock = 1;
 		err = 0;
