@@ -82,7 +82,6 @@ SYSCALL_DEFINE2(unlockfs, char*, pathname, char*, pw){
 	struct fat_boot_sector *fbs;
 	uint8_t *tab_pw;
 	int i = 0;
-	int returncode = 0
 
     kern_path(pathname, LOOKUP_FOLLOW, &path);
 
@@ -93,7 +92,7 @@ SYSCALL_DEFINE2(unlockfs, char*, pathname, char*, pw){
 	if (bh == NULL) {
 		fat_msg(sb, KERN_ERR, "unable to read boot sector "
 			"to mark fs as dirty");
-		returncode = -1;
+		return -1;
 	}
 	
 	fbs = (struct fat_boot_sector *) bh->b_data;
@@ -103,7 +102,8 @@ SYSCALL_DEFINE2(unlockfs, char*, pathname, char*, pw){
 	//Check the password
 	while(tab_pw[i] != '\0'){
 		if(tab_pw[i] != pw[i]) {
-			returncode = 1; //The password is not valid
+			brelse(bh);
+			return 1; //The password is not valid
 		}
 		i++;
 	}
@@ -111,10 +111,10 @@ SYSCALL_DEFINE2(unlockfs, char*, pathname, char*, pw){
 	//The password is valid, so unlock everything
 	sbi->unlock = 1;
 
-	mark_buffer_dirty(bh);
-	brelse(bh);
+	mark_buffer_dirty(bh); //Write it on disk
+	brelse(bh); //Clean buffer
 
-	return returncode;
+	return 0;
 }
 
 
@@ -127,8 +127,6 @@ SYSCALL_DEFINE3(changepw, char*, pathname, char*, curr_pw, char*, new_pw){
 	struct fat_boot_sector *fbs;
 	uint8_t *tab_pw;
 	int i = 0;
-	int returncode = 0;
-
     
     kern_path(pathname, LOOKUP_FOLLOW, &path);
 
@@ -138,21 +136,23 @@ SYSCALL_DEFINE3(changepw, char*, pathname, char*, curr_pw, char*, new_pw){
 	if (bh == NULL) {
 		fat_msg(sb, KERN_ERR, "unable to read boot sector "
 			"to mark fs as dirty");
-		returncode = -1;
+		return -1;
 	}
 
 	fbs = (struct fat_boot_sector *) bh->b_data;
 
 	if(curr_pw == NULL && fbs->hidden != 0){
-		returncode = 1;
-
-    }else if(curr_pw != NULL){
+		brelse(bh);
+		return 1;
+    }
+    else if(curr_pw != NULL){
     	tab_pw = (uint8_t *) &fbs->hidden;
 
     	//Check the password
     	while(curr_pw[i] != '\0'){
     		if(tab_pw[i] != curr_pw[i]){
-    			returncode = 2; //The passord is not valid
+    			brelse(bh);
+    			return 2; //The passord is not valid
     		}
     		i++;
     	}
@@ -164,10 +164,13 @@ SYSCALL_DEFINE3(changepw, char*, pathname, char*, curr_pw, char*, new_pw){
     		i++;
     	}
 		fbs->hidden = *tab_pw;
+
+		mark_buffer_dirty(bh); //Write it on disk
+		brelse(bh); //Clean buffer
+
+		return 0;
    }
 
-	mark_buffer_dirty(bh);
-	brelse(bh);
-
-    return returncode;
+   return -1;
 }
+

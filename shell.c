@@ -851,6 +851,11 @@ int main(int argc, char** argv){
                     print_failure("1", &prev_return);
                     continue;
         		}
+        		else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
         	}
 
         	//fat lock
@@ -883,11 +888,17 @@ int main(int argc, char** argv){
         			perror("A password is already set.");
                     print_failure("1", &prev_return);
                     continue;
-        		}else if(returncode == 2){
+        		}
+        		else if(returncode == 2){
         			perror("Permission denied.");
                     print_failure("1", &prev_return);
                     continue;
         		}
+        		else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
         	}
             
             //In all other cases, error
