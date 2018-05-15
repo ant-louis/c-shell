@@ -5,8 +5,6 @@
 * Operating systems : Projet 4
 *******************************************************************************************/
 
-#include <sys/types.h> 
-#include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -14,11 +12,17 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include <sys/types.h> 
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/syscall.h>
+#include <linux/msdos_fs.h>
+
 
 #define IS_COMMAND 1
 #define IS_VARIABLE 0
@@ -836,7 +840,7 @@ int main(int argc, char** argv){
         		returncode = syscall(378, cwd, args[2]);
 
         		if(returncode == 1){
-        			perror("Access denied.");
+        			perror("Permission denied.");
                     print_failure("1", &prev_return);
                     continue;
         		}
@@ -873,7 +877,7 @@ int main(int argc, char** argv){
                     print_failure("1", &prev_return);
                     continue;
         		}else if(returncode == 2){
-        			perror("Access denied.");
+        			perror("Permission denied.");
                     print_failure("1", &prev_return);
                     continue;
         		}
