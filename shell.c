@@ -832,10 +832,10 @@ int main(int argc, char** argv){
         		&& (args[2]!=NULL)){
 
         		if(!strcmp(args[1], "hide")){
-        			fat_ioctl_set_protected(open(args[2]));
+        			fat_ioctl_set_protected(open(args[2], O_RDONLY));
         		}
         		else if(!strcmp(args[1], "unhide")){
-        			fat_ioctl_set_unprotected(open(args[2]));
+        			fat_ioctl_set_unprotected(open(args[2], O_RDONLY));
         		}
 
         	}
