@@ -816,7 +816,7 @@ int main(int argc, char** argv){
 
         	//Get the current directory
         	if (getcwd(cwd, sizeof(cwd)) == NULL){
-        		perror("getcwd() error");
+        		perror("Error in getting the current directory.");
                 print_failure("1", &prev_return);
                 continue;
         	}		       
@@ -824,8 +824,7 @@ int main(int argc, char** argv){
         	//fat hide-unhide /path/to/file
         	if ((args[1]!=NULL) 
         		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
-        		&& (args[2]!=NULL))
-        	{
+        		&& (args[2]!=NULL)){
 
 
         	}
@@ -877,11 +876,7 @@ int main(int argc, char** argv){
         			perror("Access denied.");
                     print_failure("1", &prev_return);
                     continue;
-        		}else if(returncode < 0){
-                    perror("Syscall failed.");
-                    print_failure("1", &prev_return);
-                    continue;
-                }
+        		}
         	}
             
             //In all other cases, error
