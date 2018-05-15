@@ -22,7 +22,7 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 #include <linux/msdos_fs.h>
-//#include <linux/fs/fat/fat.h>
+#include <linux/fs/fat/fat.h>
 
 
 #define IS_COMMAND 1
