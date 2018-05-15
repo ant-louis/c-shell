@@ -615,67 +615,65 @@ int main(int argc, char** argv){
                     (args[3] != NULL)&&
                     (args[4] == NULL)){
 
-                    char* dev = args[3];
+                char* dev = args[3];
 
-                    // Create a socket in UDP mode
-                    int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
-     
-                    //If socket couldn't be created
-                    if (socket_desc == -1){
-                        perror("Socket couldn't be created\n");
-                        print_failure("1", &prev_return);
-                        continue;
-                    }
-
-                    //Creating an interface structure
-                    struct ifreq my_ifreq; 
-                    //IPv4
-                    my_ifreq.ifr_addr.sa_family = AF_INET;
-
-                    size_t length_if_name= strlen(dev);
-                    //Check that the ifr_name is big enough
-                    if (length_if_name < IFNAMSIZ){ 
-
-                        memcpy(my_ifreq.ifr_name,dev,length_if_name);
-                        my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
-                    }
-                    else{
-                        perror("The interface name is too long");
-                        print_failure("1", &prev_return);
-                        continue;
-                    }
-
-                    // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
-                    if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
-
-                        perror("Couldn't retrieve the IP address");
-                        print_failure("1", &prev_return);
-                        close(socket_desc);
-                        continue;
-                    }
-
-                    //Extract the address
-                    struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf("%s",inet_ntoa(IP_address->sin_addr));
-
-                    // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
-                    if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
-
-                        perror("Couldn't retrieve the mask");
-                        print_failure("1", &prev_return);
-                        close(socket_desc);
-                        continue;
-                    }
-
-                    //Cast and extract the mask
-                    struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
-                    printf(".%s\n",inet_ntoa(mask->sin_addr));
-                    close(socket_desc);
-
-                    printf("0");
+                // Create a socket in UDP mode
+                int socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
+ 
+                //If socket couldn't be created
+                if (socket_desc == -1){
+                    perror("Socket couldn't be created\n");
+                    print_failure("1", &prev_return);
                     continue;
+                }
 
+                //Creating an interface structure
+                struct ifreq my_ifreq; 
+                //IPv4
+                my_ifreq.ifr_addr.sa_family = AF_INET;
 
+                size_t length_if_name= strlen(dev);
+                //Check that the ifr_name is big enough
+                if (length_if_name < IFNAMSIZ){ 
+
+                    memcpy(my_ifreq.ifr_name,dev,length_if_name);
+                    my_ifreq.ifr_name[length_if_name]=0; //End the name with terminating char
+                }
+                else{
+                    perror("The interface name is too long");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+
+                // Get the IP address, if successful, adress is in  my_ifreq.ifr_addr
+                if(ioctl(socket_desc,SIOCGIFADDR,&my_ifreq) == -1){
+
+                    perror("Couldn't retrieve the IP address");
+                    print_failure("1", &prev_return);
+                    close(socket_desc);
+                    continue;
+                }
+
+                //Extract the address
+                struct sockaddr_in* IP_address = (struct sockaddr_in*) &my_ifreq.ifr_addr;
+                printf("%s",inet_ntoa(IP_address->sin_addr));
+
+                // Get the mask, if successful, mask is in my_ifreq.ifr_netmask
+                if(ioctl(socket_desc, SIOCGIFNETMASK, &my_ifreq) == -1){
+
+                    perror("Couldn't retrieve the mask");
+                    print_failure("1", &prev_return);
+                    close(socket_desc);
+                    continue;
+                }
+
+                //Cast and extract the mask
+                struct sockaddr_in* mask = (struct sockaddr_in*) &my_ifreq.ifr_addr;
+                printf(".%s\n",inet_ntoa(mask->sin_addr));
+                close(socket_desc);
+
+                printf("0");
+                continue;
             }
 
         
@@ -766,10 +764,12 @@ int main(int argc, char** argv){
 
             }
 
+            //pfstat
             else if((args[1]!=NULL && args[2] != NULL) && (!strcmp(args[1], "pfstat"))){
+
                 struct pfstat* pfstat = malloc(sizeof(struct pfstat*));
                
-                int returncode = syscall(326, atoi(args[2]), pfstat);
+                int returncode = syscall(377, atoi(args[2]), pfstat);
                 if(returncode == 1){
                     perror("PID is not valid.");
                     print_failure("1", &prev_return);
@@ -798,13 +798,99 @@ int main(int argc, char** argv){
                 free(pfstat);
             }
 
+
             //In all other cases, error
             else{
                 print_failure("1", &prev_return);
                 continue;
             }
 
-        }  
+        }
+
+
+        //The command is fat
+        else if(!strcmp(args[0], "fat")){
+
+        	int returncode;
+        	char cwd[1024];
+
+        	//Get the current directory
+        	if (getcwd(cwd, sizeof(cwd)) == NULL){
+        		perror("getcwd() error");
+                print_failure("1", &prev_return);
+                continue;
+        	}		       
+		       
+        	//fat hide-unhide /path/to/file
+        	if ((args[1]!=NULL) 
+        		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
+        		&& (args[2]!=NULL))
+        	{
+
+
+        	}
+
+        	//fat unlock [currrent_password]
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))
+        			&& (args[2]!=NULL)){
+
+        		returncode = syscall(378, cwd, args[2]);
+
+        		if(returncode == 1){
+        			perror("Access denied.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        	}
+
+        	//fat lock
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
+
+        		returncode = syscall(379, cwd);
+        	}
+
+        	//fat password [current_password] [new_password]
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "password"))
+        			&& (args[2]!=NULL)){
+
+        		//If no password set yet, give a first one
+        		if(args[3]==NULL){
+        			returncode = syscall(380, cwd, NULL, args[2]);
+        		}
+        		//Check that the password is 4 characters 
+        		else if(strlen(args[3]) != 4){
+        			perror("Password must be at most 4 characters.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        		//Change current password
+        		else{
+        			returncode = syscall(380, cwd, args[2], args[3]);
+        		}
+
+        		//Check returncode
+        		if(returncode == 1){
+        			perror("A password is already set.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}else if(returncode == 2){
+        			perror("Access denied.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+        	}
+            
+            //In all other cases, error
+            else{
+                print_failure("1", &prev_return);
+                continue;
+            }
+            
+
 
         //The command isn't a built-in command
         pid = fork();
