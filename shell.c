@@ -818,7 +818,8 @@ int main(int argc, char** argv){
         else if(!strcmp(args[0], "fat")){
 
         	int returncode;
-        	char cwd[1024];
+        	char cwd[2048];
+        	int fd;
 
         	//Get the current directory
         	if (getcwd(cwd, sizeof(cwd)) == NULL){
@@ -832,12 +833,20 @@ int main(int argc, char** argv){
         		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
         		&& (args[2]!=NULL)){
 
+        		fd = open(args[2], O_RDWR, 0666);
+
         		if(!strcmp(args[1], "hide")){
-        			fat_ioctl_set_protected(open(args[2], O_RDONLY));
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, 0);
         		}
         		else if(!strcmp(args[1], "unhide")){
-        			fat_ioctl_set_unprotected(open(args[2], O_RDONLY));
+        			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, 0);
         		}
+
+        		if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
 
         	}
 
@@ -845,7 +854,9 @@ int main(int argc, char** argv){
         	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))
         			&& (args[2]!=NULL)){
 
-        		returncode = syscall(378, cwd, args[2]);
+        		fd = open(cwd, O_RDWR, 0666);
+
+        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, atoi(args[2]));
 
         		if(returncode == 1){
         			perror("Permission denied.");
@@ -862,26 +873,32 @@ int main(int argc, char** argv){
         	//fat lock
         	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
 
-        		returncode = syscall(379, cwd);
+        		fd = open(cwd, O_RDWR, 0666);
+
+        		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, 0);
         	}
 
         	//fat password [current_password] [new_password]
         	else if((args[1]!=NULL) && (!strcmp(args[1], "password"))
         			&& (args[2]!=NULL)){
 
+        		fd = open(cwd, O_RDWR, 0666);
+
         		//If no password set yet, give a first one
         		if(args[3]==NULL){
-        			returncode = syscall(380, cwd, NULL, args[2]);
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD);
         		}
         		//Check that the password is 4 characters 
-        		else if(strlen(args[3]) != 4){
-        			perror("Password must be at most 4 characters.");
+        		else if(strlen(args[3]) != 4 || atoi(args[3] == -1)){
+        			perror("Password must be at most 4 numbers.");
                     print_failure("1", &prev_return);
                     continue;
         		}
         		//Change current password
         		else{
-        			returncode = syscall(380, cwd, args[2], args[3]);
+        			returncode = ioctl(open(args[2], O_RDWR, 0666), FAT_IOCTL_SET_PASSWORD);
+
+        			strtoul()
         		}
 
         		//Check returncode
