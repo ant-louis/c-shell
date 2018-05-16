@@ -852,11 +852,9 @@ int main(int argc, char** argv){
                     continue;
                 }
                 else{
-<<<<<<< HEAD
+
                 	printf("0");
-=======
-                	 printf("0");
->>>>>>> 324cf2a19e4cb4dbca53d511da51684b42c9f27d
+
                 	continue;
                 }
         	}
