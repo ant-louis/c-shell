@@ -102,9 +102,10 @@ out:
 }
 
 
-static int fat_ioctl_set_lock(struct file *file){
+static int fat_ioctl_set_lock(struct inode *inode){
 
-	struct inode *inode = file_inode(file);
+	printk("entering fat_ioctl_set_unlock\n");
+
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
@@ -115,7 +116,7 @@ static int fat_ioctl_set_lock(struct file *file){
 
 
 
-static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
+static int fat_ioctl_set_unlock(struct inode *inode, u32 __user *user_attr){
 
 	printk("entering fat_ioctl_set_unlock");
 
@@ -123,8 +124,6 @@ static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
 	u32 pw;
 	struct fat_boot_sector *fbs;
 
-	printk("fat_ioctl_set_unlock: getting inode");
-	struct inode *inode = file_inode(file);
 	struct super_block *sb = inode->i_sb;
 	printk("fat_ioctl_set_unlock: getting sbi");
 	struct msdos_sb_info* sbi = MSDOS_SB(sb);
@@ -151,6 +150,7 @@ static int fat_ioctl_set_unlock(struct file *file, u32 __user *user_attr){
 	//Check the password : ok if password corresponds or if no password set
 	if(fbs->hidden == pw){
 		//The password is valid, so unlock everything
+		printk("Change the password\n");
 		sbi->unlock = 1;
 		err = 0;
 	}
@@ -167,7 +167,7 @@ out:
 	return err;
 }
 
-static int fat_ioctl_set_password(struct file *file, u32 __user *user_attr){
+static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
 
 	printk("entering fat_ioctl_set_password");
 
@@ -176,8 +176,6 @@ static int fat_ioctl_set_password(struct file *file, u32 __user *user_attr){
 	u16 curr_pw, new_pw, true_pw;
 	struct fat_boot_sector *fbs;
 
-	printk("fat_ioctl_set_password: getting inode");
-	struct inode *inode = file_inode(file);
 	printk("fat_ioctl_set_password: getting sb");
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh;
@@ -259,13 +257,13 @@ long fat_generic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return fat_ioctl_set_unprotected(file);
 	case FAT_IOCTL_SET_LOCK:
 		printk("fat_generic_ioctl: FAT_IOCTL_SET_LOCK");
-		return fat_ioctl_set_lock(file, user_attr);
+		return fat_ioctl_set_lock(inode, user_attr);
 	case FAT_IOCTL_SET_UNLOCK:
 		printk("fat_generic_ioctl: FAT_IOCTL_SET_UNLOCK");
-		return fat_ioctl_set_unlock(file, user_attr);
+		return fat_ioctl_set_unlock(inode, user_attr);
 	case FAT_IOCTL_SET_PASSWORD:
 		printk("fat_generic_ioctl: FAT_IOCTL_SET_PASSWORD");
-		return fat_ioctl_set_password(file, user_attr);
+		return fat_ioctl_set_password(inode, user_attr);
 	default:
 		return -ENOTTY;	/* Inappropriate ioctl for device */
 	}

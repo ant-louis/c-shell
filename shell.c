@@ -812,154 +812,162 @@ int main(int argc, char** argv){
         }
 
 
-  //       //The command is fat
-  //       else if(!strcmp(args[0], "fat")){
+        //The command is fat
+        else if(!strcmp(args[0], "fat")){
 
-  //       	uint32_t attr = 0;
-  //       	uint16_t new_pw;
-  //       	uint16_t curr_pw;
-  //       	int returncode;
-  //       	int fd;
-  //       	char cwd[2048];
+        	uint32_t attr = 0;
+        	uint16_t new_pw;
+        	uint16_t curr_pw;
+        	int returncode;
+        	int fd;
+        	char cwd[2048];
         	
-  //       	//Get the current directory
-  //       	if (getcwd(cwd, sizeof(cwd)) == NULL){
-  //       		perror("Error in getting the current directory.");
-  //               print_failure("1", &prev_return);
-  //               continue;
-  //       	}
+        	//Get the current directory
+        	if (getcwd(cwd, sizeof(cwd)) == NULL){
+        		perror("Error in getting the current directory.");
+                print_failure("1", &prev_return);
+                continue;
+        	}
 
-  //       	//File descriptor of current directory
-  //       	fd = open(cwd, O_RDONLY);       
+        	//File descriptor of current directory
+        	fd = open(cwd, O_RDONLY);       
 		       
-  //       	//fat hide-unhide /path/to/file
-  //       	if ((args[1]!=NULL) 
-  //       		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
-  //       		&& (args[2]!=NULL)){
+        	//fat hide-unhide /path/to/file
+        	if ((args[1]!=NULL) 
+        		&& ((!strcmp(args[1], "hide")) || (!strcmp(args[1], "unhide")))
+        		&& (args[2]!=NULL)){
 
-  //       		fd = open(args[2], O_RDONLY);
+        		fd = open(args[2], O_RDONLY);
 
-  //       		if(!strcmp(args[1], "hide")){
-  //       			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, &attr);
-  //       		}
-  //       		else if(!strcmp(args[1], "unhide")){
-  //       			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, &attr);
-  //       		}
+        		if(!strcmp(args[1], "hide")){
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PROTECTED, &attr);
+        		}
+        		else if(!strcmp(args[1], "unhide")){
+        			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, &attr);
+        		}
 
-  //       		if(returncode < 0){
-  //                   perror("Syscall failed.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //               }
-  //               else{
-  //               	 printf("0");
-  //               	continue;
-  //               }
-  //       	}
+        		if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else{
+                	printf("0");
+                	continue;
+                }
+        	}
 
-  //       	//fat unlock [currrent_password]
-  //       	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))){
+        	//fat unlock [currrent_password]
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))){
 
-  //       		if(args[2] == NULL){
-  //       			returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &attr);
-  //       		}
-  //       		else{
-  //       			curr_pw = (uint16_t) atoi(args[2]);
+        		if(args[2] == NULL){
+        			returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &attr);
+        		}
+        		else{
+        			curr_pw = (uint16_t) atoi(args[2]);
 
-	 //        		if(curr_pw < 0 || curr_pw > 10000){
-	 //        			perror("Password must be a number between 0000 and 9999.");
-	 //                    print_failure("1", &prev_return);
-	 //                    continue;
-	 //        		}
+	        		if(curr_pw < 0 || curr_pw > 10000){
+	        			perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+	        		}
 
-	 //        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
-  //       		}
+	        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
+        		}
         		
-  //       		if(returncode == 1){
-  //       			perror("Permission denied.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //       		}
-  //       		else if(returncode < 0){
-  //                   perror("Syscall failed.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //               }
-  //               else{
-  //               	printf("0");
-  //               	continue;
-  //               }
-  //       	}
+        		if(returncode == 1){
+        			perror("Permission denied.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        		else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else{
+                	printf("0");
+                	continue;
+                }
+        	}
 
-  //       	//fat lock
-  //       	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
+        	//fat lock
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
 
-  //       		ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
-  //           	printf("0");
-  //           	continue;
-  //       	}
+        		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
+        		if(returncode < 0){
+        			perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        		else{
+        			printf("0");
+            		continue;
+        		}
+            	
+        	}
 
-  //       	//fat password [current_password] [new_password]
-  //       	else if((args[1]!=NULL) && (!strcmp(args[1], "password"))
-  //       			&& (args[2]!=NULL)){
+        	//fat password [current_password] [new_password]
+        	else if((args[1]!=NULL) && (!strcmp(args[1], "password"))
+        			&& (args[2]!=NULL)){
 
-  //       		//If no password set yet, give a first one
-  //       		if(args[3]==NULL){
-  //       			new_pw = (uint16_t) atoi(args[2]);
+        		//If no password set yet, give a first one
+        		if(args[3]==NULL){
+        			new_pw = (uint16_t) atoi(args[2]);
 
-  //       			if(new_pw < 0 || new_pw > 9999){
-  //       				perror("Password must be a number between 0000 and 9999.");
-	 //                    print_failure("1", &prev_return);
-	 //                    continue;
-  //       			}
+        			if(new_pw < 0 || new_pw > 9999){
+        				perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+        			}
 
-  //       			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &new_pw);
-  //       		}
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &new_pw);
+        		}
 
-  //       		//Change current password
-  //       		else{
-  //       			curr_pw = (uint16_t) atoi(args[2]);
-  //       			new_pw = (uint16_t) atoi(args[3]);
+        		//Change current password
+        		else{
+        			curr_pw = (uint16_t) atoi(args[2]);
+        			new_pw = (uint16_t) atoi(args[3]);
 
-  //       			if(curr_pw < 0 || curr_pw > 9999 || new_pw < 0 || new_pw > 9999){
-  //       				perror("Password must be a number between 0000 and 9999.");
-	 //                    print_failure("1", &prev_return);
-	 //                    continue;
-  //       			}
+        			if(curr_pw < 0 || curr_pw > 9999 || new_pw < 0 || new_pw > 9999){
+        				perror("Password must be a number between 0000 and 9999.");
+	                    print_failure("1", &prev_return);
+	                    continue;
+        			}
 
-  //       			attr = (new_pw << 16) | curr_pw;
-  //       			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
-  //       		}
+        			attr = (new_pw << 16) | curr_pw;
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
+        		}
         		
-  //       		//Check returncode
-  //       		if(returncode == 1){
-  //       			perror("A password is already set.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //       		}
-  //       		else if(returncode == 2){
-  //       			perror("Permission denied.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //       		}
-  //       		else if(returncode < 0){
-  //                   perror("Syscall failed.");
-  //                   print_failure("1", &prev_return);
-  //                   continue;
-  //               }
-  //               else{
-  //               	printf("0");
-  //               	continue;
-  //               }  
-  //       	}
+        		//Check returncode
+        		if(returncode == 1){
+        			perror("A password is already set.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        		else if(returncode == 2){
+        			perror("Permission denied.");
+                    print_failure("1", &prev_return);
+                    continue;
+        		}
+        		else if(returncode < 0){
+                    perror("Syscall failed.");
+                    print_failure("1", &prev_return);
+                    continue;
+                }
+                else{
+                	printf("0");
+                	continue;
+                }  
+        	}
             
-  //           //In all other cases, error
-  //           else{
-  //               print_failure("1", &prev_return);
-  //               continue;
-  //           }
+            //In all other cases, error
+            else{
+                print_failure("1", &prev_return);
+                continue;
+            }
            
-		// }
+		}
 
 
         //The command isn't a built-in command
