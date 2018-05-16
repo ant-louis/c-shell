@@ -852,7 +852,11 @@ int main(int argc, char** argv){
                     continue;
                 }
                 else{
+<<<<<<< HEAD
                 	printf("0");
+=======
+                	 printf("0");
+>>>>>>> 324cf2a19e4cb4dbca53d511da51684b42c9f27d
                 	continue;
                 }
         	}
@@ -895,6 +899,7 @@ int main(int argc, char** argv){
         	else if((args[1]!=NULL) && (!strcmp(args[1], "lock"))){
 
         		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
+        		
         		if(returncode < 0){
         			perror("Syscall failed.");
                     print_failure("1", &prev_return);
@@ -904,7 +909,7 @@ int main(int argc, char** argv){
         			printf("0");
             		continue;
         		}
-            	
+
         	}
 
         	//fat password [current_password] [new_password]
