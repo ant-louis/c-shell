@@ -916,15 +916,16 @@ int main(int argc, char** argv){
 
         		//If no password set yet, give a first one
         		if(args[3]==NULL){
-        			new_pw = (uint16_t) atoi(args[2]) << 16;
+
+        			attr = (uint16_t) atoi(args[2]) << 16;
 
         			if(new_pw < 0 || new_pw > 9999){
         				perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
-	                    continue;
+	                    continue;  
         			}
 
-        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &new_pw);
+        			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
 
         		//Change current password
@@ -939,6 +940,7 @@ int main(int argc, char** argv){
         			}
 
         			attr = (new_pw << 16) | curr_pw;
+
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
         		
