@@ -8,46 +8,33 @@
 
 
 static int fat_ioctl_set_protected(struct file *file){
-	printk("fat_ioctl_set_protected: entering");
 
 	int err;
 	u32 attr, oldattr;
-
-	printk("fat_ioctl_set_protected: getting inode");
 	struct inode *inode = file_inode(file);
-	printk("fat_ioctl_set_protected: getting sbi");
 	struct msdos_sb_info* sbi = MSDOS_SB(inode->i_sb);
 	
 
-	printk("fat_ioctl_set_protected: mnt_want_write_file");
 	err = mnt_want_write_file(file);
 	if (err)
 		goto out;
+
 	mutex_lock(&inode->i_mutex);
-	printk("fat_ioctl_set_protected: in mutex");
-
-	if(sbi->unlock == 0){ //If its locked, we don't do anything
-		printk("fat_ioctl_set_protected: bit locked");
+	
+	//If its locked, we don't do anything
+	if(sbi->unlock == 0)
 		goto out_unlock_inode;
-	}
 
+	//Otherwise
 	oldattr = fat_make_attrs(inode);
-	printk("fat_ioctl_set_protected: getting oldattr");
-
 	attr = oldattr | ATTR_PROTECTED; /*We add ATTR_PROTECTED*/
-	printk("fat_ioctl_set_protected: modifying attr");
-
 
 	fat_save_attrs(inode, attr);
-	printk("fat_ioctl_set_protected: saving attr");
-
-	mark_inode_dirty(inode);
-	printk("fat_ioctl_set_protected: marking inode dirty");
+	mark_inode_dirty_sync(inode);
 
 out_unlock_inode:
 	mutex_unlock(&inode->i_mutex);
 	mnt_drop_write_file(file);
-	printk("fat_ioctl_set_protected: mnt_drop_write_file");
 
 out:
 	return err;
@@ -56,86 +43,64 @@ out:
 
 static int fat_ioctl_set_unprotected(struct file *file){
 	
-	printk("entering fat_ioctl_set_unprotected");
-
 	int err;
 	u32 attr, oldattr;
-	
-	printk("fat_ioctl_set_unprotected: getting inode");
 	struct inode *inode = file_inode(file);
-	printk("fat_ioctl_set_unprotected: getting sbi");
 	struct msdos_sb_info* sbi = MSDOS_SB(inode->i_sb);
 	
-	printk("fat_ioctl_set_unprotected: in mutex");
-	mutex_lock(&inode->i_mutex);
 
-	printk("fat_ioctl_set_unprotected: mnt_want_write_file");
 	err = mnt_want_write_file(file);
 	if (err)
 		goto out;
+
+	mutex_lock(&inode->i_mutex);
 	
-	if(sbi->unlock == 0){ //If its locked, we don't do anything
-		printk("fat_ioctl_set_unprotected: bit locked");
+	//If its locked, we don't do anything
+	if(sbi->unlock == 0)
 		goto out_unlock_inode;
-	}
 
+	//Otherwise
 	oldattr = fat_make_attrs(inode);
-	printk("fat_ioctl_set_unprotected: getting oldattr");
-
 	attr = oldattr & ~(ATTR_PROTECTED); 
-	printk("fat_ioctl_set_unprotected: modifying attr");
 
 	fat_save_attrs(inode, attr);
-	printk("fat_ioctl_set_unprotected: saving attr");
-
-	mark_inode_dirty(inode);
-	printk("fat_ioctl_set_unprotected: marking inode dirty");
+	mark_inode_dirty_sync(inode);
 
 out_unlock_inode:
 	mutex_unlock(&inode->i_mutex);
 	mnt_drop_write_file(file);
-	printk("fat_ioctl_set_unprotected: mnt_drop_write_file");
 
 out:
 	return err;
-
 }
 
 
 static int fat_ioctl_set_lock(struct inode *inode){
 
-	printk("entering fat_ioctl_set_unlock\n");
-
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-
+	
 	sbi->unlock = 0;
 
 	return 0;
 }
 
 
-
 static int fat_ioctl_set_unlock(struct inode *inode, u32 __user *user_attr){
-
-	printk("entering fat_ioctl_set_unlock");
 
 	int err;
 	u32 pw;
 	struct fat_boot_sector *fbs;
-
-	struct super_block *sb = inode->i_sb;
-	printk("fat_ioctl_set_unlock: getting sbi");
-	struct msdos_sb_info* sbi = MSDOS_SB(sb);
 	struct buffer_head *bh;
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info* sbi = MSDOS_SB(sb);
 
-	printk("fat_ioctl_set_unlock: in mutex");
-	mutex_lock(&inode->i_mutex);
 
-	printk("fat_ioctl_set_unlock: get_user");
 	err = get_user(pw, user_attr);
 	if (err)
 		goto out;
+	
+	mutex_lock(&inode->i_mutex);
 	
 	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
@@ -146,11 +111,11 @@ static int fat_ioctl_set_unlock(struct inode *inode, u32 __user *user_attr){
 	}
 	
 	fbs = (struct fat_boot_sector *) bh->b_data;
+	
 
 	//Check the password : ok if password corresponds or if no password set
 	if(fbs->hidden == pw){
 		//The password is valid, so unlock everything
-		printk("Change the password\n");
 		sbi->unlock = 1;
 		err = 0;
 	}
@@ -159,7 +124,6 @@ static int fat_ioctl_set_unlock(struct inode *inode, u32 __user *user_attr){
 		err = 1;
 	}
 
-	printk("changepw: brelse");
 	brelse(bh); //Clean buffer
 	mutex_unlock(&inode->i_mutex);
 	
@@ -169,27 +133,21 @@ out:
 
 static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
 
-	printk("entering fat_ioctl_set_password");
-
 	int err;
 	u32 attr;
 	u16 given_pw, new_pw, true_pw;
 	struct fat_boot_sector *fbs;
-
-	printk("fat_ioctl_set_password: getting sb");
-	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh;
-	
-	printk("fat_ioctl_set_password: in mutex");
-	mutex_lock(&inode->i_mutex);
+	struct super_block *sb = inode->i_sb;
 
+	
 	err = get_user(attr, user_attr);
 	if (err)
 		goto out;
 
-	bh = sb_bread(sb,0);
-	printk("fat_ioctl_set_password: sb_read");
+	mutex_lock(&inode->i_mutex);
 
+	bh = sb_bread(sb,0);
 	if (bh == NULL) {
 		fat_msg(sb, KERN_ERR, "unable to read boot sector "
 			"to mark fs as dirty");
@@ -198,33 +156,27 @@ static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
 	}
 
 	fbs = (struct fat_boot_sector *) bh->b_data;
-	printk("fat_ioctl_set_password: getting boot sector");
 
+	//Dividing the given attribute to the different passwords
 	given_pw = attr & 0xffff;
 	new_pw = attr >> 16;
 	true_pw = fbs->hidden;
 
-	if(given_pw == 0 && true_pw != 0){
-		printk("fat_ioctl_set_password: old_pw null and hidden not 0");
+	//If no password given but a password already exists -> error
+	if(given_pw == 0 && true_pw != 0)
 		err = 1;
 
-    }
-    else if(given_pw != 0 &&  given_pw != true_pw){
-		printk("fat_ioctl_set_password: given_pw not null --> getting pw");
-		err = 2; //The passord is not valid
+    //If a password is given but doesn't correspond to the current one -> error
+    else if(given_pw != 0 &&  given_pw != true_pw)
+		err = 2;
 
-	}
+	//All other cases (no password given and no password set - password given ok)
 	else{
-		printk("fat_ioctl_set_password: setting pw");
 		fbs->hidden = new_pw;
-
-		mark_buffer_dirty(bh); //Write it on disk
-		printk("changepw: bf dirty");
-		
+		mark_buffer_dirty(bh); //Write it on disk		
 		err = 0;
 	}
 
-	printk("changepw: brelse");
 	brelse(bh);
 	mutex_unlock(&inode->i_mutex);
 
@@ -234,37 +186,55 @@ out:
 
 
 
-long fat_generic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	printk("fat_generic_ioctl: entering");
 
-	struct inode *inode = file_inode(file);
+	struct inode *inode = file_inode(filp);
 	u32 __user *user_attr = (u32 __user *)arg;
-	printk("fat_generic_ioctl: getting inode");
 
 	switch (cmd) {
 	case FAT_IOCTL_GET_ATTRIBUTES:
 		return fat_ioctl_get_attributes(inode, user_attr);
 	case FAT_IOCTL_SET_ATTRIBUTES:
-		return fat_ioctl_set_attributes(file, user_attr);
+		return fat_ioctl_set_attributes(filp, user_attr);
 	case FAT_IOCTL_GET_VOLUME_ID:
 		return fat_ioctl_get_volume_id(inode, user_attr);
 	case FAT_IOCTL_SET_PROTECTED:
-		printk("fat_generic_ioctl: SET PROTECTED CASE");
-		return fat_ioctl_set_protected(file);
+		return fat_ioctl_set_protected(filp);
 	case FAT_IOCTL_SET_UNPROTECTED:
-		printk("fat_generic_ioctl: SET UNPROTECTED CASE");
-		return fat_ioctl_set_unprotected(file);
+		return fat_ioctl_set_unprotected(filp);
 	case FAT_IOCTL_SET_LOCK:
-		printk("fat_generic_ioctl: FAT_IOCTL_SET_LOCK");
-		return fat_ioctl_set_lock(inode, user_attr);
+		return fat_ioctl_set_lock(inode);
 	case FAT_IOCTL_SET_UNLOCK:
-		printk("fat_generic_ioctl: FAT_IOCTL_SET_UNLOCK");
 		return fat_ioctl_set_unlock(inode, user_attr);
 	case FAT_IOCTL_SET_PASSWORD:
-		printk("fat_generic_ioctl: FAT_IOCTL_SET_PASSWORD");
 		return fat_ioctl_set_password(inode, user_attr);
 	default:
 		return -ENOTTY;	/* Inappropriate ioctl for device */
 	}
+}
+
+
+static int fat_file_open(struct inode *inode, struct file *filp){
+
+	struct super_block *sb;
+	struct msdos_sb_info *sbi;
+	int err;
+	
+	mutex_lock(&inode->i_mutex);
+
+	sb = inode->i_sb;
+	sbi = MSDOS_SB(sb);
+
+	if((sbi->unlock == 0) && (MSDOS_I(inode)->i_attrs & ATTR_PROTECTED)){
+		err = -ENOENT;
+		goto out;
+	}
+	err = 0;
+
+out_unlock_inode:
+	mutex_lock(&inode->i_mutex);
+
+out:
+	return err;
 }
