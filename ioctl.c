@@ -173,7 +173,7 @@ static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
 
 	int err;
 	u32 attr;
-	u16 curr_pw, new_pw, true_pw;
+	u16 given_pw, new_pw, true_pw;
 	struct fat_boot_sector *fbs;
 
 	printk("fat_ioctl_set_password: getting sb");
@@ -200,17 +200,17 @@ static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
 	fbs = (struct fat_boot_sector *) bh->b_data;
 	printk("fat_ioctl_set_password: getting boot sector");
 
-	curr_pw = attr & 0xff;
+	given_pw = attr & 0xffff;
 	new_pw = attr >> 16;
 	true_pw = fbs->hidden;
 
-	if(curr_pw == 0 && true_pw != 0){
+	if(given_pw == 0 && true_pw != 0){
 		printk("fat_ioctl_set_password: old_pw null and hidden not 0");
 		err = 1;
 
     }
-    else if(curr_pw != 0 &&  curr_pw != true_pw){
-		printk("fat_ioctl_set_password: curr_pw not null --> getting pw");
+    else if(given_pw != 0 &&  given_pw != true_pw){
+		printk("fat_ioctl_set_password: given_pw not null --> getting pw");
 		err = 2; //The passord is not valid
 
 	}
