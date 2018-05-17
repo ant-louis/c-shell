@@ -2,7 +2,7 @@
 *
 * Antoine Louis & Tom Crasset
 *
-* Operating systems : Projet 4
+* Operating systems : Projet 6
 *******************************************************************************************/
 
 #include <stdlib.h>
@@ -777,17 +777,14 @@ int main(int argc, char** argv){
                 if(returncode == 1){
                     perror("PID is not valid.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else if(returncode == 2){
                     perror("Pfstat pointer is not valid.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else if(returncode < 0){
                     perror("Syscall failed.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else{
                     printf("stack_low %d\n", pfstat->stack_low);
@@ -800,6 +797,7 @@ int main(int argc, char** argv){
                     printf("0");
                 }
                 free(pfstat);
+                continue;
             }
 
 
@@ -817,7 +815,7 @@ int main(int argc, char** argv){
 
         	uint32_t attr = 0;
         	uint16_t new_pw;
-        	uint16_t curr_pw;
+        	uint16_t given_pw;
         	int returncode;
         	int fd;
         	char cwd[2048];
@@ -846,51 +844,46 @@ int main(int argc, char** argv){
         			returncode = ioctl(fd, FAT_IOCTL_SET_UNPROTECTED, &attr);
         		}
 
+        		//Check the returned code
         		if(returncode < 0){
                     perror("Syscall failed.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else{
-
                 	printf("0");
-
-                	continue;
                 }
+                continue;
         	}
 
-        	//fat unlock [currrent_password]
+        	//fat unlock [given_password]
         	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))){
 
         		if(args[2] == NULL){
         			returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &attr);
         		}
         		else{
-        			curr_pw = (uint16_t) atoi(args[2]);
+        			given_pw = (uint16_t) atoi(args[2]);
 
-	        		if(curr_pw < 0 || curr_pw > 10000){
+	        		if(given_pw < 0 || given_pw > 9999){
 	        			perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
 	                    continue;
 	        		}
-
-	        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &curr_pw);
+	        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &given_pw);
         		}
         		
         		if(returncode == 1){
         			perror("Permission denied.");
-                    print_failure("1", &prev_return);
-                    continue;
+                    print_failure("1", &prev_return); 
         		}
         		else if(returncode < 0){
-                    perror("Syscall failed.");
+                    perror("ioctl failed.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else{
                 	printf("0");
-                	continue;
                 }
+                continue;
         	}
 
         	//fat lock
@@ -899,15 +892,13 @@ int main(int argc, char** argv){
         		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
         		
         		if(returncode < 0){
-        			perror("Syscall failed.");
+        			perror("ioctl failed.");
                     print_failure("1", &prev_return);
-                    continue;
         		}
         		else{
         			printf("0");
-            		continue;
         		}
-
+        		continue;
         	}
 
         	//fat password [current_password] [new_password]
@@ -923,22 +914,20 @@ int main(int argc, char** argv){
 	                    print_failure("1", &prev_return);
 	                    continue;
         			}
-
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
 
         		//Change current password
         		else{
-        			curr_pw = (uint16_t) atoi(args[2]);
+        			given_pw = (uint16_t) atoi(args[2]);
         			new_pw = (uint16_t) atoi(args[3]);
 
-        			if(curr_pw < 0 || curr_pw > 9999 || new_pw < 0 || new_pw > 9999){
+        			if(given_pw < 0 || given_pw > 9999 || new_pw < 0 || new_pw > 9999){
         				perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
 	                    continue;
         			}
-
-        			attr = (new_pw << 16) | curr_pw;
+        			attr = (new_pw << 16) | given_pw;
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
         		
@@ -946,22 +935,19 @@ int main(int argc, char** argv){
         		if(returncode == 1){
         			perror("A password is already set.");
                     print_failure("1", &prev_return);
-                    continue;
         		}
         		else if(returncode == 2){
         			perror("Permission denied.");
                     print_failure("1", &prev_return);
-                    continue;
         		}
         		else if(returncode < 0){
-                    perror("Syscall failed.");
+                    perror("ioctl failed.");
                     print_failure("1", &prev_return);
-                    continue;
                 }
                 else{
                 	printf("0");
-                	continue;
-                }  
+                } 
+                continue;
         	}
             
             //In all other cases, error
@@ -969,7 +955,7 @@ int main(int argc, char** argv){
                 print_failure("1", &prev_return);
                 continue;
             }
-           
+         
 		}
 
 
