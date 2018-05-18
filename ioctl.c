@@ -232,9 +232,7 @@ static int fat_file_open(struct inode *inode, struct file *filp){
 	}
 	err = 0;
 
-out_unlock_inode:
-	mutex_lock(&inode->i_mutex);
-
 out:
+	mutex_unlock(&inode->i_mutex);
 	return err;
 }
