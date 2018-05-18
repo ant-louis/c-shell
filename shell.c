@@ -846,7 +846,7 @@ int main(int argc, char** argv){
 
         		//Check the returned code
         		if(returncode < 0){
-                    perror("Syscall failed.");
+                    perror("ioctl call failed.");
                     print_failure("1", &prev_return);
                 }
                 else{
@@ -858,17 +858,16 @@ int main(int argc, char** argv){
         	//fat unlock [given_password]
         	else if((args[1]!=NULL) && (!strcmp(args[1], "unlock"))){
 
-        		if(args[2] == NULL){
+        		if(args[2] == NULL || (!strcmp(args[2], ""))){
         			returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &attr);
         		}
         		else{
-        			given_pw = (uint16_t) atoi(args[2]);
-
-	        		if(given_pw < 0 || given_pw > 9999){
+	        		if(atoi(args[2]) < 0 || atoi(args[2]) > 9999){
 	        			perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
 	                    continue;
 	        		}
+	        		given_pw = (uint16_t) atoi(args[2]);
 	        		returncode = ioctl(fd, FAT_IOCTL_SET_UNLOCK, &given_pw);
         		}
         		
@@ -877,7 +876,7 @@ int main(int argc, char** argv){
                     print_failure("1", &prev_return); 
         		}
         		else if(returncode < 0){
-                    perror("ioctl failed.");
+                    perror("ioctl call failed.");
                     print_failure("1", &prev_return);
                 }
                 else{
@@ -892,7 +891,7 @@ int main(int argc, char** argv){
         		returncode = ioctl(fd, FAT_IOCTL_SET_LOCK, &attr);
         		
         		if(returncode < 0){
-        			perror("ioctl failed.");
+        			perror("ioctl call failed.");
                     print_failure("1", &prev_return);
         		}
         		else{
@@ -906,28 +905,26 @@ int main(int argc, char** argv){
         			&& (args[2]!=NULL)){
 
         		//If no password set yet, give a first one
-        		if(args[3]==NULL){
+        		if(!strcmp(args[2], "")){
 
-        			attr = (uint16_t) atoi(args[2]) << 16;
-
-        			if(new_pw < 0 || new_pw > 9999){
+        			if(atoi(args[3]) < 0 || atoi(args[3]) > 9999){
         				perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
 	                    continue;  
         			}
+        			attr = (uint16_t) atoi(args[3]) << 16;
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
 
         		//Change current password
         		else{
-        			given_pw = (uint16_t) atoi(args[2]);
-        			new_pw = (uint16_t) atoi(args[3]);
-
-        			if(given_pw < 0 || given_pw > 9999 || new_pw < 0 || new_pw > 9999){
+        			if(atoi(args[2]) < 0 || atoi(args[2]) > 9999 || atoi(args[3]) < 0 || atoi(args[3]) > 9999){
         				perror("Password must be a number between 0000 and 9999.");
 	                    print_failure("1", &prev_return);
 	                    continue;
         			}
+        			given_pw = (uint16_t) atoi(args[2]);
+        			new_pw = (uint16_t) atoi(args[3]);
         			attr = (new_pw << 16) | given_pw;
         			returncode = ioctl(fd, FAT_IOCTL_SET_PASSWORD, &attr);
         		}
@@ -942,7 +939,7 @@ int main(int argc, char** argv){
                     print_failure("1", &prev_return);
         		}
         		else if(returncode < 0){
-                    perror("ioctl failed.");
+                    perror("ioctl call failed.");
                     print_failure("1", &prev_return);
                 }
                 else{
