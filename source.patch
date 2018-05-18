@@ -1,0 +1,732 @@
+diff --git a/CREDITS b/CREDITS
+index 8207cc6..5680840 100644
+--- a/CREDITS
++++ b/CREDITS
+@@ -780,6 +780,11 @@ D: Support for Xircom PGSDB9 (firmware and host driver)
+ S: Bucharest
+ S: Romania
+ 
++N: Tom Crasset
++E: tom.crasset@student.uliege.be
++S: Liege
++S: Belgium
++
+ N: Laurence Culhane
+ E: loz@holmes.demon.co.uk
+ D: Wrote the initial alpha SLIP code
+@@ -2208,6 +2213,11 @@ S: 8786 Niwot Road
+ S: Niwot, Colorado 80503
+ S: USA
+ 
++N: Antoine Louis
++E: antoinelouis@student.uliege.be
++S: Liege
++S: Belgium
++
+ N: Robert M. Love
+ E: rml@tech9.net
+ E: rml@novell.com
+diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+index e62f440..81fd1ab 100644
+--- a/arch/x86/entry/syscalls/syscall_32.tbl
++++ b/arch/x86/entry/syscalls/syscall_32.tbl
+@@ -383,3 +383,6 @@
+ 374	i386	userfaultfd		sys_userfaultfd
+ 375	i386	membarrier		sys_membarrier
+ 376	i386	mlock2			sys_mlock2
++
++377	i386 	pfstat			sys_pfstat
++
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index 314a90b..e9e3e01 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -332,7 +332,6 @@
+ 323	common	userfaultfd		sys_userfaultfd
+ 324	common	membarrier		sys_membarrier
+ 325	common	mlock2			sys_mlock2
+-
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+ # for native 64-bit operation.
+diff --git a/fs/fat/dir.c b/fs/fat/dir.c
+index 8b2127f..a1efefc 100644
+--- a/fs/fat/dir.c
++++ b/fs/fat/dir.c
+@@ -588,6 +588,7 @@ static int __fat_readdir(struct inode *inode, struct file *file,
+ get_new:
+ 	if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
+ 		goto end_of_dir;
++
+ parse_record:
+ 	nr_slots = 0;
+ 	/*
+@@ -654,6 +655,12 @@ parse_record:
+ 	fill_len = short_len;
+ 
+ start_filldir:
++
++    if((sbi->unlock == 0) && (de->attr & ATTR_PROTECTED)){
++        goto record_end;
++
++	}
++	
+ 	ctx->pos = cpos - (nr_slots + 1) * sizeof(struct msdos_dir_entry);
+ 	if (fake_offset && ctx->pos < 2)
+ 		ctx->pos = 2;
+diff --git a/fs/fat/fat.h b/fs/fat/fat.h
+index be5e153..22a7652 100644
+--- a/fs/fat/fat.h
++++ b/fs/fat/fat.h
+@@ -6,7 +6,7 @@
+ #include <linux/hash.h>
+ #include <linux/ratelimit.h>
+ #include <linux/msdos_fs.h>
+-
++#include <linux/mount.h>
+ /*
+  * vfat shortname flags
+  */
+@@ -101,6 +101,8 @@ struct msdos_sb_info {
+ 
+ 	unsigned int dirty;           /* fs state before mount */
+ 	struct rcu_head rcu;
++
++	unsigned short unlock;	/*variable unlock set to 0 by default (so files are locked by default)*/
+ };
+ 
+ #define FAT_CACHE_VALID	0	/* special case for valid cache */
+@@ -202,6 +204,7 @@ static inline void fat_save_attrs(struct inode *inode, u8 attrs)
+ 		MSDOS_I(inode)->i_attrs = attrs & (ATTR_UNUSED | ATTR_RO);
+ }
+ 
++
+ static inline unsigned char fat_checksum(const __u8 *name)
+ {
+ 	unsigned char s = name[0];
+diff --git a/fs/fat/file.c b/fs/fat/file.c
+index a08f103..63e59ea 100644
+--- a/fs/fat/file.c
++++ b/fs/fat/file.c
+@@ -117,11 +117,218 @@ static int fat_ioctl_get_volume_id(struct inode *inode, u32 __user *user_attr)
+ 	return put_user(sbi->vol_id, user_attr);
+ }
+ 
++
++static int fat_ioctl_set_protected(struct file *file){
++
++
++	int err;
++	u32 attr, oldattr;
++	struct inode *inode;
++	struct msdos_sb_info* sbi;
++
++
++	inode = file_inode(file);
++	sbi = MSDOS_SB(inode->i_sb);
++
++	err = mnt_want_write_file(file);
++	if (err){
++		goto out;
++	}
++	mutex_lock(&inode->i_mutex);
++	
++
++	if(sbi->unlock == 0){ //If its locked, we don't do anything
++		goto out_unlock_inode;
++	}
++
++	oldattr = fat_make_attrs(inode);
++	attr = oldattr | ATTR_PROTECTED; /*We add ATTR_PROTECTED*/
++
++	fat_save_attrs(inode, attr);
++	mark_inode_dirty_sync(inode);
++
++out_unlock_inode:
++	mutex_unlock(&inode->i_mutex);
++	mnt_drop_write_file(file);
++
++out:
++	return err;
++}
++
++
++static int fat_ioctl_set_unprotected(struct file *file){
++	
++
++	int err;
++	u32 attr, oldattr;
++	struct inode *inode;
++	struct msdos_sb_info* sbi;
++
++
++	inode = file_inode(file);	
++	sbi = MSDOS_SB(inode->i_sb);
++
++	err = mnt_want_write_file(file);
++	if (err){
++		goto out;
++	}
++	mutex_lock(&inode->i_mutex);
++	
++	
++	if(sbi->unlock == 0){ //If its locked, we don't do anything
++		goto out_unlock_inode;
++	}
++
++	oldattr = fat_make_attrs(inode);
++	attr = oldattr & ~(ATTR_PROTECTED); 
++
++	fat_save_attrs(inode, attr);
++	mark_inode_dirty_sync(inode);
++
++out_unlock_inode:
++	mutex_unlock(&inode->i_mutex);
++	mnt_drop_write_file(file);
++
++out:
++	return err;
++
++}
++
++
++static int fat_ioctl_set_lock(struct inode *inode){
++
++
++	struct super_block *sb;
++	struct msdos_sb_info *sbi;
++
++
++	sb = inode->i_sb;
++	sbi = MSDOS_SB(sb);
++
++	sbi->unlock = 0;
++
++
++	return 0;
++}
++
++
++
++static int fat_ioctl_set_unlock(struct inode *inode, u32 __user *user_attr){
++
++
++	int err;
++	u32 pw;
++	struct fat_boot_sector *fbs;
++	struct buffer_head *bh;
++	struct super_block *sb;
++	struct msdos_sb_info* sbi;
++
++
++	sb = inode->i_sb;
++	sbi = MSDOS_SB(sb);
++
++	err = get_user(pw, user_attr);
++	if (err){
++		goto out;
++	}
++	mutex_lock(&inode->i_mutex);
++	
++	bh = sb_bread(sb, 0);
++	if (bh == NULL) {
++		fat_msg(sb, KERN_ERR, "unable to read boot sector "
++			"to mark fs as dirty");
++		mutex_unlock(&inode->i_mutex);
++		return -1;
++	}
++	
++	fbs = (struct fat_boot_sector *) bh->b_data;
++	
++
++	//Check the password : ok if password corresponds or if no password set
++	if(fbs->hidden == pw){
++		//The password is valid, so unlock everything
++		sbi->unlock = 1;
++		err = 0;
++	}
++	else{
++		//The password is not valid
++		err = 1;
++	}
++
++	brelse(bh); //Clean buffer
++	mutex_unlock(&inode->i_mutex);
++	
++out:
++	return err;
++}
++
++static int fat_ioctl_set_password(struct inode *inode, u32 __user *user_attr){
++
++
++	int err;
++	u32 attr;
++	u16 given_pw, new_pw, true_pw;
++	struct fat_boot_sector *fbs;
++	struct buffer_head *bh;
++	struct super_block *sb;
++
++	sb = inode->i_sb;
++
++	err = get_user(attr, user_attr);
++	if (err){
++		goto out;
++	}
++	mutex_lock(&inode->i_mutex);
++
++	bh = sb_bread(sb,0);
++	if (bh == NULL) {
++		fat_msg(sb, KERN_ERR, "unable to read boot sector "
++			"to mark fs as dirty");
++		mutex_unlock(&inode->i_mutex);
++		return -1;
++	}
++
++	fbs = (struct fat_boot_sector *) bh->b_data;
++
++
++	//Dividing the given attribute to the different passwords
++	given_pw = attr & 0xffff;
++	new_pw = attr >> 16;
++	true_pw = fbs->hidden;
++
++
++	//If no password given but a password already exists -> error
++	if(given_pw == 0 && true_pw != 0){
++		err = 1;
++    }
++    //If a password is given but doesn't correspond to the current one -> error
++    else if(given_pw != 0 &&  given_pw != true_pw){
++		err = 2; //The passord is not valid
++
++	}
++	//All other cases (no password given and no password set - password given ok)
++	else{
++		fbs->hidden = new_pw;
++		mark_buffer_dirty(bh); //Write it on disk		
++		err = 0;
++	}
++
++	brelse(bh);
++	mutex_unlock(&inode->i_mutex);
++
++out:
++	return err;
++}
++
++
++
+ long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ {
++
+ 	struct inode *inode = file_inode(filp);
+ 	u32 __user *user_attr = (u32 __user *)arg;
+ 
++
+ 	switch (cmd) {
+ 	case FAT_IOCTL_GET_ATTRIBUTES:
+ 		return fat_ioctl_get_attributes(inode, user_attr);
+@@ -129,6 +336,16 @@ long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 		return fat_ioctl_set_attributes(filp, user_attr);
+ 	case FAT_IOCTL_GET_VOLUME_ID:
+ 		return fat_ioctl_get_volume_id(inode, user_attr);
++	case FAT_IOCTL_SET_PROTECTED:
++		return fat_ioctl_set_protected(filp);
++	case FAT_IOCTL_SET_UNPROTECTED:
++		return fat_ioctl_set_unprotected(filp);
++	case FAT_IOCTL_SET_LOCK:
++		return fat_ioctl_set_lock(inode);
++	case FAT_IOCTL_SET_UNLOCK:
++		return fat_ioctl_set_unlock(inode, user_attr);
++	case FAT_IOCTL_SET_PASSWORD:
++		return fat_ioctl_set_password(inode, user_attr);
+ 	default:
+ 		return -ENOTTY;	/* Inappropriate ioctl for device */
+ 	}
+@@ -164,8 +381,28 @@ int fat_file_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
+ 	return res ? res : err;
+ }
+ 
++static int fat_file_open(struct inode *inode, struct file *filp){
++
++	struct super_block *sb = inode->i_sb;
++	struct msdos_sb_info *sbi = MSDOS_SB(sb);
++	int err;
++	
++	mutex_lock(&inode->i_mutex);
++
++	if((sbi->unlock == 0) && (MSDOS_I(inode)->i_attrs & ATTR_PROTECTED)){
++		err = -ENOENT;
++		goto out;
++	}
++	err = 0;
++
++out:
++	mutex_unlock(&inode->i_mutex);
++	return err;
++}
++
+ 
+ const struct file_operations fat_file_operations = {
++	.open 		= fat_file_open,
+ 	.llseek		= generic_file_llseek,
+ 	.read_iter	= generic_file_read_iter,
+ 	.write_iter	= generic_file_write_iter,
+diff --git a/include/linux/init_task.h b/include/linux/init_task.h
+index 1c1ff7e..e4916ee 100644
+--- a/include/linux/init_task.h
++++ b/include/linux/init_task.h
+@@ -189,6 +189,7 @@ extern struct task_group root_task_group;
+  */
+ #define INIT_TASK(tsk)	\
+ {									\
++	.pfstatMode     = 0,					\
+ 	.state		= 0,						\
+ 	.stack		= &init_thread_info,				\
+ 	.usage		= ATOMIC_INIT(2),				\
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ce0f61d..366dae4 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1377,7 +1377,25 @@ struct tlbflush_unmap_batch {
+ 	bool writable;
+ };
+ 
++/*
++* Struct that is tracking different kind of pagefault for a given process
++*/
++struct pfstat {
++	int stack_low; //Number of times the stack was expanded after a page faultx
++	int transparent_hugepage_fault; //Number of huge page transparent PMD fault
++	int anonymous_fault; //Normal anonymous page fault
++	int file_fault; //Normal file-backed page fault
++	int swapped_back; //Number of fault that produced a read-from swap to put back the page online
++	int copy_on_write; //Number of fault which backed a copy-on-write;
++	int fault_alloced_page; //Number of normal pages allocated due to a pagefault (no matter the code path if it was for an anonymous fault, a cow, ...).
++};
++
+ struct task_struct {
++	
++	//Information about process statistics
++	int pfstatMode;
++	struct pfstat pfStats;
++
+ 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+ 	void *stack;
+ 	atomic_t usage;
+diff --git a/include/uapi/linux/msdos_fs.h b/include/uapi/linux/msdos_fs.h
+index e956704..8ec8daa 100644
+--- a/include/uapi/linux/msdos_fs.h
++++ b/include/uapi/linux/msdos_fs.h
+@@ -37,9 +37,10 @@
+ #define ATTR_VOLUME	8	/* volume label */
+ #define ATTR_DIR	16	/* directory */
+ #define ATTR_ARCH	32	/* archived */
++#define ATTR_PROTECTED 64 /*protected*/
+ 
+ /* attribute bits that are copied "as is" */
+-#define ATTR_UNUSED	(ATTR_VOLUME | ATTR_ARCH | ATTR_SYS | ATTR_HIDDEN)
++#define ATTR_UNUSED	(ATTR_VOLUME | ATTR_ARCH | ATTR_SYS | ATTR_HIDDEN | ATTR_PROTECTED)
+ /* bits that are used by the Windows 95/Windows NT extended FAT */
+ #define ATTR_EXT	(ATTR_RO | ATTR_HIDDEN | ATTR_SYS | ATTR_VOLUME)
+ 
+@@ -106,6 +107,13 @@ struct __fat_dirent {
+ #define FAT_IOCTL_SET_ATTRIBUTES	_IOW('r', 0x11, __u32)
+ /*Android kernel has used 0x12, so we use 0x13*/
+ #define FAT_IOCTL_GET_VOLUME_ID		_IOR('r', 0x13, __u32)
++#define FAT_IOCTL_SET_PROTECTED		_IOW('r', 0x14, __u32)
++#define FAT_IOCTL_SET_UNPROTECTED	_IOW('r', 0x15, __u32)
++#define FAT_IOCTL_SET_LOCK			_IOW('r', 0x16, __u32)
++#define FAT_IOCTL_SET_UNLOCK		_IOW('r', 0x17, __u32)
++#define FAT_IOCTL_SET_PASSWORD		_IOW('r', 0x18, __u32)
++
++
+ 
+ struct fat_boot_sector {
+ 	__u8	ignored[3];	/* Boot strap short or near jump */
+diff --git a/init/main.c b/init/main.c
+index 9e64d70..381795b 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -884,6 +884,10 @@ static void __init do_basic_setup(void)
+ 	usermodehelper_enable();
+ 	do_initcalls();
+ 	random_int_secret_init();
++
++	printk("Hello INFO0940!");
++
++
+ }
+ 
+ static void __init do_pre_smp_initcalls(void)
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 78947de..96c04e1 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -52,6 +52,8 @@
+ #include <linux/rcupdate.h>
+ #include <linux/uidgid.h>
+ #include <linux/cred.h>
++#include <linux/namei.h>
++#include "../../fs/fat/fat.h"
+ 
+ #include <linux/kmsg_dump.h>
+ /* Move somewhere else to avoid recompiling? */
+@@ -61,6 +63,8 @@
+ #include <asm/io.h>
+ #include <asm/unistd.h>
+ 
++#include "../../fs/fat/fat.h"
++
+ #ifndef SET_UNALIGN_CTL
+ # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
+ #endif
+@@ -236,6 +240,65 @@ out:
+ 	return error;
+ }
+ 
++
++
++SYSCALL_DEFINE2(pfstat, pid_t, pid,struct pfstat*, pfstat){
++
++	//Get the task_struct of the given process
++	struct task_struct* process_task_struct = NULL;
++	char* processname;
++
++	if(process_task_struct == NULL){
++		return 1;
++	}
++
++	if(pfstat == NULL){
++		return 2;
++	}
++
++	printk("[PFSTAT] Syscall entered!");
++
++	if(process_task_struct->pfstatMode == 0){
++
++		process_task_struct->pfstatMode = 1;
++
++		processname = process_task_struct->comm;
++
++		printk("[PFSTAT] Process %s is now in PFSTAT mode",processname);
++
++		//Set  all fields of the process pfstat structure to 0 to start counting
++		memset(&process_task_struct->pfStats,0,sizeof(struct pfstat));
++		memset(pfstat,0,sizeof(struct pfstat));
++
++		return 0;
++
++	}else{
++
++
++		copy_to_user(pfstat,&process_task_struct->pfStats,sizeof(struct pfstat));
++
++/*
++		//Get the process pfstat structure after some time
++		pfstat->stack_low = process_task_struct->pfStats.stack_low;
++		pfstat->transparent_hugepage_fault = process_task_struct->pfStats.transparent_hugepage_fault;
++		pfstat->anonymous_fault = process_task_struct->pfStats.anonymous_fault;
++		pfstat->file_fault = process_task_struct->pfStats.file_fault;
++		pfstat->swapped_back = process_task_struct->pfStats.swapped_back;
++		pfstat->copy_on_write = process_task_struct->pfStats.copy_on_write;
++		pfstat->fault_alloced_page = process_task_struct->pfStats.fault_alloced_page;
++*/
++		//Reset  all fields of the process pfstat structure 
++		memset(&process_task_struct->pfStats,0,sizeof(struct pfstat));
++
++		return 0;
++
++	}
++
++	return -1;
++}
++
++
++
+ /*
+  * Ugh. To avoid negative return values, "getpriority()" will
+  * not return the normal nice-value, but a negated value that
+@@ -307,6 +370,9 @@ out_unlock:
+ 	return retval;
+ }
+ 
++
++
++
+ /*
+  * Unprivileged users may change the real gid to the effective gid
+  * or vice versa.  (BSD-style)
+@@ -1259,6 +1325,8 @@ SYSCALL_DEFINE2(gethostname, char __user *, name, int, len)
+ 
+ #endif
+ 
++
++
+ /*
+  * Only setdomainname; getdomainname can be implemented by calling
+  * uname()
+diff --git a/mm/Makefile b/mm/Makefile
+index 2ed4319..3a4f570 100644
+--- a/mm/Makefile
++++ b/mm/Makefile
+@@ -81,3 +81,4 @@ obj-$(CONFIG_CMA_DEBUGFS) += cma_debug.o
+ obj-$(CONFIG_USERFAULTFD) += userfaultfd.o
+ obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
+ obj-$(CONFIG_FRAME_VECTOR) += frame_vector.o
++
+diff --git a/mm/filemap.c b/mm/filemap.c
+index c33c31d..6a828fa 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -1942,6 +1942,8 @@ static void do_async_mmap_readahead(struct vm_area_struct *vma,
+  */
+ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ {
++
++	
+ 	int error;
+ 	struct file *file = vma->vm_file;
+ 	struct address_space *mapping = file->f_mapping;
+@@ -1952,6 +1954,9 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	loff_t size;
+ 	int ret = 0;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.file_fault++;
++	
+ 	size = round_up(i_size_read(inode), PAGE_CACHE_SIZE);
+ 	if (offset >= size >> PAGE_CACHE_SHIFT)
+ 		return VM_FAULT_SIGBUS;
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index ea11123..f8bf833 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -3719,6 +3719,9 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
+ 	struct address_space *mapping;
+ 	int need_wait_lock = 0;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.transparent_hugepage_fault++;
++
+ 	address &= huge_page_mask(h);
+ 
+ 	ptep = huge_pte_offset(mm, address);
+diff --git a/mm/memory.c b/mm/memory.c
+index 76dcee3..6fcb994 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -2109,6 +2109,10 @@ static int wp_page_copy(struct mm_struct *mm, struct vm_area_struct *vma,
+ 	const unsigned long mmun_end = mmun_start + PAGE_SIZE;	/* For mmu_notifiers */
+ 	struct mem_cgroup *memcg;
+ 
++	
++	if(current->pfstatMode == 1)
++		current->pfStats.fault_alloced_page++;
++
+ 	if (unlikely(anon_vma_prepare(vma)))
+ 		goto oom;
+ 
+@@ -2487,6 +2491,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		unsigned long address, pte_t *page_table, pmd_t *pmd,
+ 		unsigned int flags, pte_t orig_pte)
+ {
++
+ 	spinlock_t *ptl;
+ 	struct page *page, *swapcache;
+ 	struct mem_cgroup *memcg;
+@@ -2496,6 +2501,9 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 	int exclusive = 0;
+ 	int ret = 0;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.swapped_back++;
++
+ 	if (!pte_unmap_same(mm, pmd, page_table, orig_pte))
+ 		goto out;
+ 
+@@ -2704,11 +2712,15 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		unsigned long address, pte_t *page_table, pmd_t *pmd,
+ 		unsigned int flags)
+ {
++
+ 	struct mem_cgroup *memcg;
+ 	struct page *page;
+ 	spinlock_t *ptl;
+ 	pte_t entry;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.anonymous_fault++;
++
+ 	pte_unmap(page_table);
+ 
+ 	/* File mapping without ->vm_ops ? */
+@@ -3020,12 +3032,17 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		unsigned long address, pmd_t *pmd,
+ 		pgoff_t pgoff, unsigned int flags, pte_t orig_pte)
+ {
++
++	
+ 	struct page *fault_page, *new_page;
+ 	struct mem_cgroup *memcg;
+ 	spinlock_t *ptl;
+ 	pte_t *pte;
+ 	int ret;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.copy_on_write++;
++
+ 	if (unlikely(anon_vma_prepare(vma)))
+ 		return VM_FAULT_OOM;
+ 
+@@ -3275,6 +3292,10 @@ out:
+ static int create_huge_pmd(struct mm_struct *mm, struct vm_area_struct *vma,
+ 			unsigned long address, pmd_t *pmd, unsigned int flags)
+ {
++	if(current->pfstatMode == 1)
++		current->pfStats.transparent_hugepage_fault++;
++
++
+ 	if (vma_is_anonymous(vma))
+ 		return do_huge_pmd_anonymous_page(mm, vma, address, pmd, flags);
+ 	if (vma->vm_ops->pmd_fault)
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 455772a..b6e49a0 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -110,7 +110,7 @@ void vma_set_page_prot(struct vm_area_struct *vma)
+ 
+ 
+ int sysctl_overcommit_memory __read_mostly = OVERCOMMIT_GUESS;  /* heuristic overcommit */
+-int sysctl_overcommit_ratio __read_mostly = 50;	/* default is 50% */
++int sysctl_overcommit_ratio __read_mostly = 50;	 /*default is 50% */
+ unsigned long sysctl_overcommit_kbytes __read_mostly;
+ int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
+ unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
+@@ -2303,8 +2303,12 @@ int expand_downwards(struct vm_area_struct *vma,
+ #ifdef CONFIG_STACK_GROWSUP
+ int expand_stack(struct vm_area_struct *vma, unsigned long address)
+ {
++
+ 	struct vm_area_struct *next;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.stack_low++;
++
+ 	address &= PAGE_MASK;
+ 	next = vma->vm_next;
+ 	if (next && next->vm_start == address + PAGE_SIZE) {
+@@ -2332,8 +2336,12 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
+ #else
+ int expand_stack(struct vm_area_struct *vma, unsigned long address)
+ {
++
+ 	struct vm_area_struct *prev;
+ 
++	if(current->pfstatMode == 1)
++		current->pfStats.stack_low++;
++	
+ 	address &= PAGE_MASK;
+ 	prev = vma->vm_prev;
+ 	if (prev && prev->vm_end == address) {
